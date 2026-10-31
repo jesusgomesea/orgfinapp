@@ -1,0 +1,28 @@
+# Deploy no Netlify: build do Angular + funções em netlify/functions.
+[build]
+  command = "npm run build"
+  publish = "dist/org-fin/browser"
+  functions = "netlify/functions"
+
+[build.environment]
+  NODE_VERSION = "24"
+
+# O service worker e o manifest não podem ficar presos em cache, senão o app não percebe versão nova.
+[[headers]]
+  for = "/ngsw-worker.js"
+  [headers.values]
+    Cache-Control = "no-cache"
+[[headers]]
+  for = "/ngsw.json"
+  [headers.values]
+    Cache-Control = "no-cache"
+[[headers]]
+  for = "/index.html"
+  [headers.values]
+    Cache-Control = "no-cache"
+
+# SPA: qualquer rota (/calendario, /gasto/12) abre o index.html. /.netlify/functions/* não passa por aqui.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
