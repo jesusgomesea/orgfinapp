@@ -10,6 +10,7 @@ import { Parcela } from '../dominio/parcelamento';
 import { mensagemDeErro } from '../nucleo/api';
 import { Categoria, CompraForm, ContaCartao, Dados } from '../nucleo/dados';
 import { dataCurta, hoje, nomeMesCurto, reais } from '../nucleo/formato';
+import { Avisos } from '../nucleo/avisos';
 import { Ia, SugestaoGasto } from '../nucleo/ia';
 import { Icone } from '../nucleo/icone';
 
@@ -23,6 +24,7 @@ const PARCELAS_RAPIDAS = [1, 2, 3, 6, 10, 12];
 
 @Component({
   selector: 'app-gasto',
+  host: { class: 'tela tela-gasto' },
   imports: [FormsModule, Icone],
   template: `
     <header class="topo">
@@ -31,6 +33,7 @@ const PARCELAS_RAPIDAS = [1, 2, 3, 6, 10, 12];
       <span class="icone-botao"></span>
     </header>
 
+    <div class="col-principal">
     @if (!editando()) {
       <div class="conversa" aria-live="polite">
         @for (m of mensagens(); track $index) {
@@ -56,9 +59,12 @@ const PARCELAS_RAPIDAS = [1, 2, 3, 6, 10, 12];
           @for (e of exemplos; track e) { <button type="button" class="ficha" (click)="frase = e">{{ e }}</button> }
         </div>
       }
+    } @else {
+      <p class="suave">Editar refaz todas as parcelas desta compra.</p>
     }
+    </div>
 
-    <form class="cartao" (ngSubmit)="salvar()">
+    <form class="cartao col-lateral" (ngSubmit)="salvar()">
       <label class="campo-valor">
         Valor total
         <span><small>R$</small><input name="valor" type="number" inputmode="decimal" step="0.01" min="0.01" [(ngModel)]="form.valor_total" required placeholder="0,00" /></span>
@@ -126,6 +132,7 @@ export class Gasto implements OnInit {
   private readonly dados = inject(Dados);
   private readonly ia = inject(Ia);
   private readonly router = inject(Router);
+  private readonly avisos = inject(Avisos);
 
   /** Vem da rota /gasto/:id ("novo" = criar). */
   readonly id = input<string>();
@@ -226,8 +233,11 @@ export class Gasto implements OnInit {
     if (!compra.descricao?.trim()) return this.erro.set('Diga o que foi comprado.');
     this.salvando.set(true);
     try {
+      const primeira = this.previa()[0];
       await this.dados.salvarCompra(compra);
-      await this.router.navigateByUrl('/calendario');
+      this.avisos.mostrar(compra.parcelas > 1 ? `Gasto salvo em ${compra.parcelas} parcelas` : 'Gasto salvo');
+      // Abre o calendário no mês em que a 1ª parcela caiu (pode ser mês que vem, ou depois, no cartão).
+      await this.router.navigate(['/calendario'], { queryParams: primeira ? { m: primeira.competencia.slice(0, 7) } : {} });
     } catch (e) {
       this.erro.set(mensagemDeErro(e));
     } finally {
@@ -239,6 +249,7 @@ export class Gasto implements OnInit {
     if (!this.form.id || !confirm('Excluir este gasto e todas as parcelas dele?')) return;
     try {
       await this.dados.excluirCompra(this.form.id);
+      this.avisos.mostrar('Gasto excluído');
       await this.router.navigateByUrl('/calendario');
     } catch (e) {
       this.erro.set(mensagemDeErro(e));

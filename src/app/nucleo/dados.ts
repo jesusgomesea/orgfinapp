@@ -2,7 +2,7 @@
 // documento uma vez, guarda em memória e monta as listas que as telas pedem. Toda alteração vai para o servidor,
 // que valida, calcula as parcelas e devolve o documento atualizado.
 // Os tipos espelham netlify/lib/operacoes.mts — mudou lá, mude aqui.
-import { Injectable } from '@angular/core';
+import { Injectable, signal } from '@angular/core';
 import { Parcela, TipoConta, gerarParcelas } from '../dominio/parcelamento';
 import { chamar } from './api';
 
@@ -106,25 +106,43 @@ export const CATEGORIAS_SUGERIDAS: { nome: string; cor: string }[] = [
 @Injectable({ providedIn: 'root' })
 export class Dados {
   private cache: Promise<Banco> | null = null;
+  private baixadoEm = 0;
+  /** Muda sempre que os dados mudam (gravação aqui ou dados novos do servidor): as telas recarregam ao ver isso. */
+  readonly versao = signal(0);
 
   /** Documento inteiro (baixa na primeira vez; depois usa a cópia em memória). */
   banco(): Promise<Banco> {
-    this.cache ??= chamar<Banco>('dados').catch((e) => {
-      this.cache = null; // erro de rede não pode ficar guardado
-      throw e;
-    });
+    this.cache ??= chamar<Banco>('dados').then(
+      (b) => {
+        this.baixadoEm = Date.now();
+        return b;
+      },
+      (e) => {
+        this.cache = null; // erro de rede não pode ficar guardado
+        throw e;
+      },
+    );
     return this.cache;
   }
 
   /** Força baixar de novo (ex.: outro aparelho pode ter lançado algo). */
-  recarregar(): Promise<Banco> {
+  async recarregar(): Promise<Banco> {
     this.cache = null;
-    return this.banco();
+    const b = await this.banco();
+    this.versao.update((v) => v + 1);
+    return b;
+  }
+
+  /** Ao voltar para o app: se a cópia em memória tem mais de 1 minuto, busca de novo (celular + computador). */
+  async atualizarSeAntigo(): Promise<void> {
+    if (this.cache && Date.now() - this.baixadoEm > 60_000) await this.recarregar().catch(() => {});
   }
 
   private async enviar(acao: object): Promise<Banco> {
     const novo = await chamar<Banco>('dados', { corpo: acao });
     this.cache = Promise.resolve(novo);
+    this.baixadoEm = Date.now();
+    this.versao.update((v) => v + 1);
     return novo;
   }
 

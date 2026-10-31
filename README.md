@@ -18,7 +18,10 @@ sem banco externo nem outra conta para configurar.
   com "Geladeira 3/10 — R$ 300,00 → Casas Bahia · Eletrodomésticos".
 - **Painel do mês:** gasto × renda (com o "olhinho" para esconder valores), atalhos, cartões de crédito desenhados com a
   fatura do mês, gastos por categoria com ícones, próximos 30 dias e quanto dos próximos 12 meses já está comprometido.
+- **Calendário:** busca no mês (descrição, loja, categoria, cartão); ao salvar um gasto, abre no mês da 1ª parcela.
 - **Ajustes:** renda, formas de pagamento, categorias e **backup** (baixar / restaurar um arquivo .json).
+- **Funciona em qualquer tela:** celular (barra de abas embaixo), tablet (blocos lado a lado) e desktop (menu lateral,
+  telas em duas colunas, tecla **N** abre um novo gasto). Ao voltar para o app, busca o que outro aparelho lançou.
 
 ### Em que mês cai a 1ª parcela
 

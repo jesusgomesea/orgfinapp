@@ -1,6 +1,6 @@
 // Calendário do mês: grade com o total de cada dia e, abaixo, os gastos agrupados por dia, com o detalhe de cada
 // parcela ("Geladeira 3/10 — R$ 300,00 → Casas Bahia · Eletrodomésticos"). Usa data_prevista (o dia em que cai).
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, effect, inject, input, signal, untracked } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { diasNoMes, formatar, lerData } from '../dominio/parcelamento';
 import { mensagemDeErro } from '../nucleo/api';
@@ -20,6 +20,7 @@ interface Dia {
 
 @Component({
   selector: 'app-calendario',
+  host: { class: 'tela tela-calendario' },
   imports: [RouterLink, Icone, IconeCategoria],
   template: `
     <header class="topo">
@@ -33,6 +34,7 @@ interface Dia {
 
     @if (erro()) { <p class="aviso erro">{{ erro() }}</p> }
 
+    <div class="col-principal">
     <section class="cartao">
       <div class="grade">
         @for (s of semana; track $index) { <span class="dia-semana">{{ s[0] }}</span> }
@@ -53,6 +55,13 @@ interface Dia {
         <span>Total <strong>{{ reais(totalMes()) }}</strong></span>
       </div>
     </section>
+    </div>
+
+    <div class="col-lateral">
+    <label class="busca campo-icone">
+      <app-icone nome="busca" />
+      <input type="search" [value]="busca()" (input)="busca.set($any($event.target).value)" placeholder="Buscar gasto, loja ou categoria" aria-label="Buscar no mês" />
+    </label>
 
     @if (selecionado()) {
       <div class="filtro-dia">
@@ -84,14 +93,19 @@ interface Dia {
       </section>
     } @empty {
       <div class="cartao vazio">
-        <p>Nada lançado {{ selecionado() ? 'neste dia' : 'neste mês' }}.</p>
-        <a class="botao primario" routerLink="/gasto/novo"><app-icone nome="mais" /> Lançar um gasto</a>
+        <p>{{ busca() ? 'Nada encontrado para "' + busca() + '".' : 'Nada lançado ' + (selecionado() ? 'neste dia' : 'neste mês') + '.' }}</p>
+        @if (!busca()) { <a class="botao primario" routerLink="/gasto/novo"><app-icone nome="mais" /> Lançar um gasto</a> }
       </div>
     }
+    </div>
   `,
 })
 export class Calendario {
   private readonly dados = inject(Dados);
+
+  /** ?m=AAAA-MM abre direto nesse mês (usado ao salvar um gasto: mostra onde a 1ª parcela caiu). */
+  readonly m = input<string>();
+  protected readonly busca = signal('');
 
   protected readonly reais = reais;
   protected readonly lerData = lerData;
@@ -120,21 +134,32 @@ export class Calendario {
 
   protected readonly grupos = computed(() => {
     const dia = this.selecionado();
-    const lista = dia ? this.lancamentos().filter((l) => l.data_prevista === dia) : this.lancamentos();
+    const termo = semAcento(this.busca());
+    const lista = this.lancamentos()
+      .filter((l) => !dia || l.data_prevista === dia)
+      .filter((l) => !termo || semAcento(`${l.compra.descricao} ${l.compra.estabelecimento ?? ''} ${l.compra.categoria?.nome ?? ''} ${l.compra.conta_cartao?.nome ?? ''}`).includes(termo));
     const mapa = new Map<string, LancamentoDetalhado[]>();
     for (const l of lista) mapa.set(l.data_prevista, [...(mapa.get(l.data_prevista) ?? []), l]);
     return [...mapa].map(([data, itens]) => ({ data, itens, total: itens.reduce((t, l) => t + l.valor, 0) }));
   });
 
   constructor() {
-    this.carregar();
+    effect(() => {
+      const m = /^(\d{4})-(\d{2})$/.exec(this.m() ?? '');
+      if (m) untracked(() => this.mes.set({ ano: +m[1], mes: +m[2] }));
+    });
+    // Recarrega quando o mês muda ou os dados mudam (gravação, ou dados novos de outro aparelho).
+    effect(() => {
+      this.mes();
+      this.dados.versao();
+      untracked(() => this.carregar());
+    });
   }
 
   protected mudarMes(quantos: number) {
     const { ano, mes } = this.mes();
     this.mes.set(navegarMes(ano, mes, quantos));
     this.selecionado.set(null);
-    this.carregar();
   }
 
   protected selecionar(data: string) {
@@ -158,4 +183,8 @@ export class Calendario {
       this.erro.set(mensagemDeErro(e));
     }
   }
+}
+
+function semAcento(t: string): string {
+  return t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
 }

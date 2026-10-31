@@ -13,6 +13,7 @@ type ContaEdicao = Omit<ContaCartao, 'id'> & { id?: number };
 
 @Component({
   selector: 'app-cadastros',
+  host: { class: 'tela tela-ajustes' },
   imports: [FormsModule, Icone, IconeCategoria],
   template: `
     <header class="topo"><h1>Ajustes</h1></header>

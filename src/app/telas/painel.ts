@@ -17,6 +17,7 @@ const DIAS_PROXIMOS = 30;
 
 @Component({
   selector: 'app-painel',
+  host: { class: 'tela tela-painel' },
   imports: [RouterLink, Icone, IconeCategoria],
   template: `
     <header class="topo">
@@ -34,8 +35,14 @@ const DIAS_PROXIMOS = 30;
 
     @if (erro()) { <p class="aviso erro">{{ erro() }}</p> }
 
+    <div class="col-principal">
     <section class="heroi">
       <div class="heroi-topo">
+        @if (variacao(); as v) {
+          <span class="variacao vidro" [class.subiu]="v.pct > 0" [title]="'Mês anterior: ' + priv.mostrar(totalAnterior())">
+            <app-icone [nome]="v.pct > 0 ? 'subindo' : 'descendo'" /> {{ v.pct > 0 ? '+' : '' }}{{ v.pct }}% vs {{ v.mes }}
+          </span>
+        }
         <div class="seletor-mes vidro">
           <button type="button" (click)="mudarMes(-1)" aria-label="Mês anterior"><app-icone nome="esquerda" /></button>
           <span>{{ titulo() }}</span>
@@ -84,6 +91,9 @@ const DIAS_PROXIMOS = 30;
       </div>
     }
 
+    </div>
+
+    <div class="col-lateral">
     <section class="cartao">
       <h2>Por categoria</h2>
       @if (porCategoria().length) {
@@ -145,6 +155,7 @@ const DIAS_PROXIMOS = 30;
         }
       </div>
     </section>
+    </div>
   `,
 })
 export class Painel {
@@ -171,6 +182,14 @@ export class Painel {
   protected readonly renda = computed(() => Number(this.config()?.renda_mensal ?? 0));
   protected readonly totalMes = computed(() => soma(this.doMes()));
   protected readonly totalFuturo = computed(() => soma(this.aVencer()));
+  protected readonly totalAnterior = signal(0);
+  /** Comparação com o mês anterior (só aparece se os dois meses têm gasto). Subir = gastou mais. */
+  protected readonly variacao = computed(() => {
+    const antes = this.totalAnterior();
+    if (!antes || !this.totalMes()) return null;
+    const anterior = navegarMes(this.mes().ano, this.mes().mes, -1);
+    return { pct: Math.round(((this.totalMes() - antes) / antes) * 100), mes: NOMES_MES[anterior.mes - 1].slice(0, 3).toLowerCase() };
+  });
   protected readonly sobra = computed(() => this.renda() - this.totalMes());
   protected readonly percentual = computed(() => (this.renda() > 0 ? Math.round((this.totalMes() / this.renda()) * 100) : 0));
   protected readonly percentualBarra = computed(() => Math.min(this.percentual(), 100));
@@ -222,14 +241,20 @@ export class Painel {
   protected readonly maiorFuturo = computed(() => Math.max(1, ...this.futuro().map((m) => m.total)));
 
   constructor() {
-    Promise.all([this.dados.configuracao(), this.dados.contas()])
-      .then(([c, contas]) => {
-        this.config.set(c);
-        this.contas.set(contas);
-      })
-      .catch((e) => this.erro.set(mensagemDeErro(e)));
-    this.carregarProximos();
-    this.carregar();
+    // Recarrega tudo quando os dados mudam (gravação, ou dados novos de outro aparelho).
+    effect(() => {
+      this.dados.versao();
+      untracked(() => {
+        Promise.all([this.dados.configuracao(), this.dados.contas()])
+          .then(([c, contas]) => {
+            this.config.set(c);
+            this.contas.set(contas);
+          })
+          .catch((e) => this.erro.set(mensagemDeErro(e)));
+        this.carregarProximos();
+        this.carregar();
+      });
+    });
     // untracked: a animação lê o valor exibido, e isso não pode virar dependência do efeito (rodaria em loop).
     effect(() => {
       const destino = this.totalMes();
@@ -273,15 +298,18 @@ export class Painel {
     const inicio = primeiroDia(ano, mes);
     const depois = navegarMes(ano, mes, 1);
     const fim = navegarMes(ano, mes, MESES_A_FRENTE);
+    const antes = navegarMes(ano, mes, -1);
     this.erro.set('');
     const pedido = ++this.pedido;
     try {
-      const [doMes, aVencer] = await Promise.all([
+      const [doMes, aVencer, anterior] = await Promise.all([
         this.dados.lancamentosPorCompetencia(inicio, inicio),
         this.dados.lancamentosPorCompetencia(primeiroDia(depois.ano, depois.mes), primeiroDia(fim.ano, fim.mes)),
+        this.dados.lancamentosPorCompetencia(primeiroDia(antes.ano, antes.mes), primeiroDia(antes.ano, antes.mes)),
       ]);
       // Trocou de mês rápido: a resposta antiga chega depois e não pode sobrescrever a nova.
       if (pedido !== this.pedido) return;
+      this.totalAnterior.set(soma(anterior));
       this.doMes.set(doMes);
       this.aVencer.set(aVencer);
     } catch (e) {
