@@ -1,12 +1,13 @@
-// Gera os ícones do PWA (public/icons/*.png) sem dependências: fundo marinho e três barras subindo.
+// Gera os ícones do PWA (public/icons/*.png) sem dependências: fundo quase preto e três barras subindo,
+// a última no verde-limão de destaque (mesmos tokens de src/styles.scss).
 // O desenho fica dentro dos 80% centrais para funcionar como ícone "maskable" (Android corta as bordas).
 // Rodar só quando quiser mudar o ícone: node scripts/gerar-icones.mjs
 import { writeFileSync } from 'node:fs';
 import { deflateSync } from 'node:zlib';
 
 const TAMANHOS = [72, 96, 128, 144, 152, 192, 384, 512];
-const FUNDO = [15, 42, 74];
-const BARRAS = [[143, 182, 232], [143, 182, 232], [74, 222, 128]];
+const FUNDO = [9, 9, 11];
+const BARRAS = [[63, 63, 70], [113, 113, 122], [207, 255, 4]];
 
 function desenhar(n) {
   const px = Buffer.alloc(n * n * 3);

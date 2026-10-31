@@ -1,8 +1,10 @@
-// Acesso às tabelas do Supabase (ver supabase/schema.sql). As telas não falam com o banco direto: passam por aqui.
-// usuario_id não é enviado — o banco preenche com auth.uid() e a RLS impede mexer em dados de outra pessoa.
+// Acesso aos dados. O servidor (netlify/functions/dados.mts) guarda tudo num documento só; aqui o app baixa esse
+// documento uma vez, guarda em memória e monta as listas que as telas pedem. Toda alteração vai para o servidor,
+// que valida, calcula as parcelas e devolve o documento atualizado.
+// Os tipos espelham netlify/lib/operacoes.mts — mudou lá, mude aqui.
 import { Injectable } from '@angular/core';
 import { Parcela, TipoConta, gerarParcelas } from '../dominio/parcelamento';
-import { supabase } from './supabase';
+import { chamar } from './api';
 
 export interface Configuracao {
   renda_mensal: number;
@@ -34,6 +36,31 @@ export interface CompraForm {
   categoria_id: number | null;
   conta_id: number | null;
   origem: 'manual' | 'ia';
+}
+
+interface Compra extends CompraForm {
+  id: number;
+  criado_em: string;
+}
+
+interface Lancamento {
+  id: number;
+  compra_id: number;
+  numero: number;
+  total_parcelas: number;
+  valor: number;
+  competencia: string;
+  data_prevista: string;
+}
+
+export interface Banco {
+  versao: 1;
+  proximo_id: number;
+  configuracao: Configuracao | null;
+  categorias: Categoria[];
+  contas: ContaCartao[];
+  compras: Compra[];
+  lancamentos: Lancamento[];
 }
 
 /** Parcela já com os dados da compra, pronta para o calendário e o painel. */
@@ -76,108 +103,84 @@ export const CATEGORIAS_SUGERIDAS: { nome: string; cor: string }[] = [
   { nome: 'Outros', cor: '#64748b' },
 ];
 
-const SELECT_LANCAMENTO =
-  'id, numero, total_parcelas, valor, competencia, data_prevista, ' +
-  'compra(id, descricao, estabelecimento, valor_total, categoria(nome, cor), conta_cartao(nome))';
-
 @Injectable({ providedIn: 'root' })
 export class Dados {
-  // ---------- configuração ----------
-  async configuracao(): Promise<Configuracao | null> {
-    const { data, error } = await supabase.from('configuracao').select('renda_mensal, dia_salario, saldo_inicial').maybeSingle();
-    if (error) throw error;
-    return data;
+  private cache: Promise<Banco> | null = null;
+
+  /** Documento inteiro (baixa na primeira vez; depois usa a cópia em memória). */
+  banco(): Promise<Banco> {
+    this.cache ??= chamar<Banco>('dados').catch((e) => {
+      this.cache = null; // erro de rede não pode ficar guardado
+      throw e;
+    });
+    return this.cache;
   }
 
-  async salvarConfiguracao(c: Configuracao): Promise<void> {
-    const { error } = await supabase.from('configuracao').upsert(c);
-    if (error) throw error;
+  /** Força baixar de novo (ex.: outro aparelho pode ter lançado algo). */
+  recarregar(): Promise<Banco> {
+    this.cache = null;
+    return this.banco();
+  }
+
+  private async enviar(acao: object): Promise<Banco> {
+    const novo = await chamar<Banco>('dados', { corpo: acao });
+    this.cache = Promise.resolve(novo);
+    return novo;
+  }
+
+  // ---------- configuração ----------
+  async configuracao(): Promise<Configuracao | null> {
+    return (await this.banco()).configuracao;
+  }
+
+  async salvarConfiguracao(dados: Configuracao): Promise<void> {
+    await this.enviar({ acao: 'salvarConfiguracao', dados });
   }
 
   // ---------- categorias ----------
   async categorias(): Promise<Categoria[]> {
-    const { data, error } = await supabase.from('categoria').select('id, nome, cor').order('nome');
-    if (error) throw error;
-    return data;
+    return [...(await this.banco()).categorias].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
   }
 
-  async salvarCategoria(c: Partial<Categoria> & { nome: string; cor: string }): Promise<void> {
-    const { error } = c.id
-      ? await supabase.from('categoria').update({ nome: c.nome, cor: c.cor }).eq('id', c.id)
-      : await supabase.from('categoria').insert({ nome: c.nome, cor: c.cor });
-    if (error) throw error;
+  async salvarCategoria(dados: Partial<Categoria> & { nome: string; cor: string }): Promise<void> {
+    await this.enviar({ acao: 'salvarCategoria', dados });
   }
 
-  async criarCategorias(lista: { nome: string; cor: string }[]): Promise<void> {
-    if (!lista.length) return;
-    const { error } = await supabase.from('categoria').upsert(lista, { onConflict: 'usuario_id,nome', ignoreDuplicates: true });
-    if (error) throw error;
+  async criarCategorias(dados: { nome: string; cor: string }[]): Promise<void> {
+    if (dados.length) await this.enviar({ acao: 'criarCategorias', dados });
   }
 
   async excluirCategoria(id: number): Promise<void> {
-    const { error } = await supabase.from('categoria').delete().eq('id', id);
-    if (error) throw error;
+    await this.enviar({ acao: 'excluirCategoria', id });
   }
 
   // ---------- contas e cartões ----------
   async contas(): Promise<ContaCartao[]> {
-    const { data, error } = await supabase
-      .from('conta_cartao')
-      .select('id, nome, tipo, dia_fechamento, dia_vencimento')
-      .order('nome');
-    if (error) throw error;
-    return data as ContaCartao[];
+    return [...(await this.banco()).contas].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
   }
 
-  async salvarConta(c: Omit<ContaCartao, 'id'> & { id?: number }): Promise<void> {
-    // Fechamento/vencimento só fazem sentido no crédito (regra em dominio/parcelamento.ts).
-    const registro = {
-      nome: c.nome,
-      tipo: c.tipo,
-      dia_fechamento: c.tipo === 'credito' ? c.dia_fechamento || null : null,
-      dia_vencimento: c.tipo === 'credito' ? c.dia_vencimento || null : null,
-    };
-    const { error } = c.id
-      ? await supabase.from('conta_cartao').update(registro).eq('id', c.id)
-      : await supabase.from('conta_cartao').insert(registro);
-    if (error) throw error;
+  async salvarConta(dados: Omit<ContaCartao, 'id'> & { id?: number }): Promise<void> {
+    await this.enviar({ acao: 'salvarConta', dados });
   }
 
-  /** Usado no primeiro acesso: se a pessoa tentar de novo depois de um erro, não duplica nem falha. */
-  async criarContas(lista: Omit<ContaCartao, 'id'>[]): Promise<void> {
-    if (!lista.length) return;
-    const registros = lista.map((c) => ({
-      nome: c.nome,
-      tipo: c.tipo,
-      dia_fechamento: c.tipo === 'credito' ? c.dia_fechamento || null : null,
-      dia_vencimento: c.tipo === 'credito' ? c.dia_vencimento || null : null,
-    }));
-    const { error } = await supabase.from('conta_cartao').upsert(registros, { onConflict: 'usuario_id,nome', ignoreDuplicates: true });
-    if (error) throw error;
+  /** Primeiro acesso: repetir depois de um erro não duplica (o servidor ignora nomes já existentes). */
+  async criarContas(dados: Omit<ContaCartao, 'id'>[]): Promise<void> {
+    if (dados.length) await this.enviar({ acao: 'criarContas', dados });
   }
 
   async excluirConta(id: number): Promise<void> {
-    const { error } = await supabase.from('conta_cartao').delete().eq('id', id);
-    if (error) throw error;
+    await this.enviar({ acao: 'excluirConta', id });
   }
 
   // ---------- compras e parcelas ----------
   async compra(id: number): Promise<CompraForm | null> {
-    const { data, error } = await supabase
-      .from('compra')
-      .select('id, descricao, estabelecimento, valor_total, parcelas, data_compra, categoria_id, conta_id, origem')
-      .eq('id', id)
-      .maybeSingle();
-    if (error) throw error;
-    return data ? { ...data, estabelecimento: data.estabelecimento ?? '', valor_total: Number(data.valor_total) } : null;
+    const c = (await this.banco()).compras.find((x) => x.id === id);
+    return c ? { ...c } : null;
   }
 
-  /** Calcula as parcelas e grava tudo de uma vez (função salvar_compra no banco). */
-  async salvarCompra(compra: CompraForm, contas: ContaCartao[]): Promise<number> {
-    const parcelas = this.previaParcelas(compra, contas);
-    const { data, error } = await supabase.rpc('salvar_compra', { p_compra: compra, p_lancamentos: parcelas });
-    if (error) throw error;
-    return data as number;
+  /** O servidor recalcula as parcelas com a mesma regra; a prévia é só para mostrar antes de salvar. */
+  async salvarCompra(dados: CompraForm): Promise<void> {
+    await this.enviar({ acao: 'salvarCompra', dados });
   }
 
   previaParcelas(compra: Pick<CompraForm, 'valor_total' | 'parcelas' | 'data_compra' | 'conta_id'>, contas: ContaCartao[]): Parcela[] {
@@ -186,41 +189,50 @@ export class Dados {
   }
 
   async excluirCompra(id: number): Promise<void> {
-    // As parcelas vão junto (on delete cascade).
-    const { error } = await supabase.from('compra').delete().eq('id', id);
-    if (error) throw error;
+    await this.enviar({ acao: 'excluirCompra', id });
   }
 
   /** Parcelas que caem no calendário entre duas datas (inclusive). */
   async lancamentosPorData(de: string, ate: string): Promise<LancamentoDetalhado[]> {
-    const { data, error } = await supabase
-      .from('lancamento')
-      .select(SELECT_LANCAMENTO)
-      .gte('data_prevista', de)
-      .lte('data_prevista', ate)
-      .order('data_prevista');
-    if (error) throw error;
-    return normalizar(data);
+    return this.detalhar(await this.banco(), (l) => l.data_prevista >= de && l.data_prevista <= ate);
   }
 
   /** Parcelas por mês de competência (painel), de 'AAAA-MM-01' até 'AAAA-MM-01'. */
   async lancamentosPorCompetencia(de: string, ate: string): Promise<LancamentoDetalhado[]> {
-    const { data, error } = await supabase
-      .from('lancamento')
-      .select(SELECT_LANCAMENTO)
-      .gte('competencia', de)
-      .lte('competencia', ate)
-      .order('competencia');
-    if (error) throw error;
-    return normalizar(data);
+    return this.detalhar(await this.banco(), (l) => l.competencia >= de && l.competencia <= ate);
   }
-}
 
-// numeric do Postgres chega como texto em alguns casos; normaliza para número.
-function normalizar(linhas: unknown): LancamentoDetalhado[] {
-  return (linhas as LancamentoDetalhado[]).map((l) => ({
-    ...l,
-    valor: Number(l.valor),
-    compra: { ...l.compra, valor_total: Number(l.compra.valor_total) },
-  }));
+  // ---------- backup ----------
+  async backup(): Promise<Banco> {
+    return this.recarregar();
+  }
+
+  async restaurar(dados: unknown): Promise<void> {
+    await this.enviar({ acao: 'restaurarBackup', dados });
+  }
+
+  /** Junta parcela + compra + categoria + cartão, ordenado por dia. */
+  private detalhar(b: Banco, filtro: (l: Lancamento) => boolean): LancamentoDetalhado[] {
+    const compras = new Map(b.compras.map((c) => [c.id, c]));
+    const categorias = new Map(b.categorias.map((c) => [c.id, c]));
+    const contas = new Map(b.contas.map((c) => [c.id, c]));
+    return b.lancamentos
+      .filter(filtro)
+      .flatMap((l) => {
+        const c = compras.get(l.compra_id);
+        if (!c) return [];
+        const cat = c.categoria_id ? categorias.get(c.categoria_id) : undefined;
+        const conta = c.conta_id ? contas.get(c.conta_id) : undefined;
+        return [{
+          id: l.id, numero: l.numero, total_parcelas: l.total_parcelas, valor: l.valor,
+          competencia: l.competencia, data_prevista: l.data_prevista,
+          compra: {
+            id: c.id, descricao: c.descricao, estabelecimento: c.estabelecimento || null, valor_total: c.valor_total,
+            categoria: cat ? { nome: cat.nome, cor: cat.cor } : null,
+            conta_cartao: conta ? { nome: conta.nome } : null,
+          },
+        }];
+      })
+      .sort((a, b) => a.data_prevista.localeCompare(b.data_prevista) || a.id - b.id);
+  }
 }

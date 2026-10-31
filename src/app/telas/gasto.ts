@@ -1,59 +1,82 @@
 // Novo gasto / editar gasto. Duas formas de preencher:
 //  1) frase livre (digitada ou falada) → Gemini sugere os campos → a pessoa confere;
-//  2) formulário manual (sempre disponível, inclusive sem internet para a IA).
-// Antes de gravar mostra a prévia das parcelas, exatamente como vão aparecer no calendário.
+//  2) formulário manual (sempre disponível, inclusive se a IA estiver fora).
+// Antes de gravar mostra a prévia das parcelas, exatamente como vão aparecer no calendário
+// (o servidor recalcula com a mesma regra ao salvar).
 import { Component, inject, input, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { Parcela } from '../dominio/parcelamento';
+import { mensagemDeErro } from '../nucleo/api';
 import { Categoria, CompraForm, ContaCartao, Dados } from '../nucleo/dados';
 import { dataCurta, hoje, nomeMesCurto, reais } from '../nucleo/formato';
 import { Ia, SugestaoGasto } from '../nucleo/ia';
-import { mensagemDeErro } from '../nucleo/supabase';
+import { Icone } from '../nucleo/icone';
 
 // Reconhecimento de voz do navegador (Chrome/Android e Safari). Onde não existir, o ditado do teclado resolve.
 type Reconhecedor = { lang: string; interimResults: boolean; start(): void; onresult: (e: any) => void; onerror: () => void; onend: () => void };
 const ReconhecimentoDeVoz: (new () => Reconhecedor) | undefined =
   (globalThis as any).SpeechRecognition ?? (globalThis as any).webkitSpeechRecognition;
 
+const EXEMPLOS = ['mercado 230 no pix', 'geladeira 3 mil em 10x no cartão', 'uber 27 ontem'];
+const PARCELAS_RAPIDAS = [1, 2, 3, 6, 10, 12];
+
 @Component({
   selector: 'app-gasto',
-  imports: [FormsModule],
+  imports: [FormsModule, Icone],
   template: `
     <header class="topo">
-      <button class="seta" (click)="voltar()" aria-label="Voltar">‹</button>
+      <button class="icone-botao" type="button" (click)="voltar()" aria-label="Voltar"><app-icone nome="esquerda" /></button>
       <h1>{{ editando() ? 'Editar gasto' : 'Novo gasto' }}</h1>
-      <span class="seta"></span>
+      <span class="icone-botao"></span>
     </header>
 
     @if (!editando()) {
-      <section class="cartao destaque">
-        <label>
-          Conte o gasto do seu jeito
-          <textarea rows="2" [(ngModel)]="frase" name="frase"
-                    placeholder="Ex.: geladeira 3 mil em 10x no Nubank, Casas Bahia"></textarea>
-        </label>
-        <div class="linha acoes">
-          @if (temVoz) {
-            <button type="button" (click)="ouvir()" [disabled]="ouvindo()">{{ ouvindo() ? 'Ouvindo…' : '🎤 Falar' }}</button>
-          }
-          <button type="button" class="primario" (click)="interpretar()" [disabled]="!frase.trim() || lendo()">
-            {{ lendo() ? 'Lendo…' : '✨ Preencher com IA' }}
+      <div class="conversa" aria-live="polite">
+        @for (m of mensagens(); track $index) {
+          <div class="balao" [class.app]="m.de !== 'voce'" [class.voce]="m.de === 'voce'" [class.aviso-ia]="m.de === 'aviso'">{{ m.texto }}</div>
+        }
+        @if (lendo()) { <div class="balao app digitando" aria-label="Lendo"><i></i><i></i><i></i></div> }
+      </div>
+
+      <div class="compositor">
+        <textarea rows="1" [(ngModel)]="frase" name="frase" placeholder="O que você gastou?"
+                  (keydown.enter)="enviarFrase($event)" aria-label="Descreva o gasto"></textarea>
+        @if (temVoz) {
+          <button type="button" class="icone-botao" (click)="ouvir()" [class.gravando]="ouvindo()" aria-label="Falar">
+            <app-icone nome="microfone" />
           </button>
+        }
+        <button type="button" class="icone-botao enviar" (click)="interpretar()" [disabled]="!frase.trim() || lendo()" aria-label="Enviar para a IA">
+          <app-icone nome="brilho" />
+        </button>
+      </div>
+      @if (mensagens().length === 1) {
+        <div class="fichas exemplos">
+          @for (e of exemplos; track e) { <button type="button" class="ficha" (click)="frase = e">{{ e }}</button> }
         </div>
-        @if (avisoIa()) { <p class="aviso">{{ avisoIa() }}</p> }
-      </section>
+      }
     }
 
     <form class="cartao" (ngSubmit)="salvar()">
+      <label class="campo-valor">
+        Valor total
+        <span><small>R$</small><input name="valor" type="number" inputmode="decimal" step="0.01" min="0.01" [(ngModel)]="form.valor_total" required placeholder="0,00" /></span>
+      </label>
+
       <label>O que foi <input name="descricao" [(ngModel)]="form.descricao" required placeholder="Geladeira" /></label>
       <label>Para onde (loja, pessoa…) <input name="estabelecimento" [(ngModel)]="form.estabelecimento" placeholder="Casas Bahia" /></label>
-      <div class="linha">
-        <label>Valor total (R$) <input name="valor" type="number" inputmode="decimal" step="0.01" min="0.01" [(ngModel)]="form.valor_total" required /></label>
-        <label>Parcelas <input name="parcelas" type="number" inputmode="numeric" min="1" max="120" [(ngModel)]="form.parcelas" required /></label>
+
+      <div class="rotulo">Parcelas</div>
+      <div class="fichas">
+        @for (p of parcelasRapidas; track p) {
+          <button type="button" class="ficha" [class.marcada]="+form.parcelas === p" (click)="form.parcelas = p">{{ p === 1 ? 'À vista' : p + 'x' }}</button>
+        }
+        <input class="parcelas-outra" name="parcelas" type="number" inputmode="numeric" min="1" max="120" [(ngModel)]="form.parcelas" aria-label="Outro número de parcelas" />
       </div>
+
       <div class="linha">
-        <label>Data da compra <input name="data" type="date" [(ngModel)]="form.data_compra" required /></label>
+        <label>Data <input name="data" type="date" [(ngModel)]="form.data_compra" required /></label>
         <label>Pagamento
           <select name="conta" [(ngModel)]="form.conta_id">
             <option [ngValue]="null">—</option>
@@ -61,35 +84,40 @@ const ReconhecimentoDeVoz: (new () => Reconhecedor) | undefined =
           </select>
         </label>
       </div>
-      <label>Categoria
-        <select name="categoria" [(ngModel)]="form.categoria_id">
-          <option [ngValue]="null">Sem categoria</option>
-          @for (c of categorias(); track c.id) { <option [ngValue]="c.id">{{ c.nome }}</option> }
-        </select>
-      </label>
+
+      <div class="rotulo">Categoria</div>
+      <div class="fichas">
+        @for (c of categorias(); track c.id) {
+          <button type="button" class="ficha" [class.marcada]="form.categoria_id === c.id" (click)="form.categoria_id = form.categoria_id === c.id ? null : c.id">
+            <span class="bolinha" [style.background]="c.cor"></span>{{ c.nome }}
+          </button>
+        }
+      </div>
 
       @if (previa(); as p) {
         @if (p.length) {
           <div class="previa">
-            <strong>{{ p.length === 1 ? 'Vai aparecer em' : p.length + ' parcelas' }}</strong>
-            <ul>
+            <strong>{{ p.length === 1 ? 'Vai aparecer em' : p.length + ' parcelas de ' + reais(p[p.length - 1].valor) }}</strong>
+            <ol>
               @for (x of p.slice(0, 6); track x.numero) {
                 <li>
-                  <span>{{ p.length > 1 ? x.numero + '/' + p.length + ' · ' : '' }}{{ nomeMesCurto(x.competencia) }} ({{ dataCurta(x.data_prevista) }})</span>
+                  <span>{{ p.length > 1 ? x.numero + 'ª · ' : '' }}{{ nomeMesCurto(x.competencia) }} <small>({{ dataCurta(x.data_prevista) }})</small></span>
                   <strong>{{ reais(x.valor) }}</strong>
                 </li>
               }
               @if (p.length > 6) { <li class="suave">… até {{ nomeMesCurto(p[p.length - 1].competencia) }}</li> }
-            </ul>
+            </ol>
           </div>
         }
       }
 
       @if (erro()) { <p class="aviso erro">{{ erro() }}</p> }
 
-      <button class="primario largo" type="submit" [disabled]="salvando()">{{ salvando() ? 'Salvando…' : 'Salvar' }}</button>
+      <button class="primario largo" type="submit" [disabled]="salvando()">
+        <app-icone nome="check" /> {{ salvando() ? 'Salvando…' : 'Salvar' }}
+      </button>
       @if (editando()) {
-        <button class="link perigo" type="button" (click)="excluir()">Excluir este gasto (e todas as parcelas)</button>
+        <button class="link perigo" type="button" (click)="excluir()"><app-icone nome="lixeira" /> Excluir este gasto e todas as parcelas</button>
       }
     </form>
   `,
@@ -105,6 +133,8 @@ export class Gasto implements OnInit {
   protected readonly reais = reais;
   protected readonly dataCurta = dataCurta;
   protected readonly nomeMesCurto = nomeMesCurto;
+  protected readonly exemplos = EXEMPLOS;
+  protected readonly parcelasRapidas = PARCELAS_RAPIDAS;
   protected readonly temVoz = !!ReconhecimentoDeVoz;
   protected readonly categorias = signal<Categoria[]>([]);
   protected readonly contas = signal<ContaCartao[]>([]);
@@ -113,7 +143,10 @@ export class Gasto implements OnInit {
   protected readonly ouvindo = signal(false);
   protected readonly salvando = signal(false);
   protected readonly erro = signal('');
-  protected readonly avisoIa = signal('');
+  /** Conversa com a IA: o app pergunta, a pessoa descreve, o app resume o que entendeu. */
+  protected readonly mensagens = signal<{ de: 'app' | 'voce' | 'aviso'; texto: string }[]>([
+    { de: 'app', texto: 'Me conta o que você gastou, do seu jeito. Eu preencho os detalhes pra você conferir.' },
+  ]);
   protected frase = '';
   protected form: CompraForm = {
     descricao: '', estabelecimento: '', valor_total: null as unknown as number, parcelas: 1,
@@ -149,38 +182,51 @@ export class Gasto implements OnInit {
   }
 
   protected ouvir() {
-    if (!ReconhecimentoDeVoz) return;
+    if (!ReconhecimentoDeVoz || this.ouvindo()) return;
     const r = new ReconhecimentoDeVoz();
     r.lang = 'pt-BR';
     r.interimResults = false;
     r.onresult = (e) => (this.frase = (this.frase ? this.frase + ' ' : '') + e.results[0][0].transcript);
-    r.onerror = () => this.avisoIa.set('Não consegui ouvir. Tente de novo ou use o microfone do teclado.');
+    r.onerror = () => this.falar('aviso', 'Não consegui ouvir. Tente de novo ou use o microfone do teclado.');
     r.onend = () => this.ouvindo.set(false);
     this.ouvindo.set(true);
     r.start();
   }
 
+  /** Enter envia; Shift+Enter quebra linha. */
+  protected enviarFrase(e: Event) {
+    if ((e as KeyboardEvent).shiftKey) return;
+    e.preventDefault();
+    if (this.frase.trim() && !this.lendo()) this.interpretar();
+  }
+
   protected async interpretar() {
-    this.avisoIa.set('');
+    const frase = this.frase.trim();
+    this.falar('voce', frase);
+    this.frase = '';
     this.lendo.set(true);
     try {
-      const s = await this.ia.interpretar(this.frase, this.categorias().map((c) => c.nome), this.contas().map((c) => c.nome));
+      const s = await this.ia.interpretar(frase, this.categorias().map((c) => c.nome), this.contas().map((c) => c.nome));
       this.aplicar(s);
     } catch (e) {
-      this.avisoIa.set(mensagemDeErro(e));
+      this.falar('aviso', mensagemDeErro(e));
     } finally {
       this.lendo.set(false);
     }
   }
 
+  private falar(de: 'app' | 'voce' | 'aviso', texto: string) {
+    this.mensagens.update((l) => [...l, { de, texto }]);
+  }
+
   protected async salvar() {
     this.erro.set('');
     const compra: CompraForm = { ...this.form, valor_total: Number(this.form.valor_total), parcelas: Number(this.form.parcelas) };
-    if (!compra.descricao?.trim()) return this.erro.set('Diga o que foi comprado.');
     if (!(compra.valor_total > 0)) return this.erro.set('Informe o valor total.');
+    if (!compra.descricao?.trim()) return this.erro.set('Diga o que foi comprado.');
     this.salvando.set(true);
     try {
-      await this.dados.salvarCompra(compra, this.contas());
+      await this.dados.salvarCompra(compra);
       await this.router.navigateByUrl('/calendario');
     } catch (e) {
       this.erro.set(mensagemDeErro(e));
@@ -218,11 +264,19 @@ export class Gasto implements OnInit {
       conta_id: conta?.id ?? this.form.conta_id,
       origem: 'ia',
     };
-    const avisos = ['Confira os campos abaixo antes de salvar.'];
-    if (s.categoria && !categoria) avisos.push(`Categoria "${s.categoria}" não está cadastrada.`);
-    if (s.conta && !conta) avisos.push(`Forma de pagamento "${s.conta}" não está cadastrada.`);
+    const f = this.form;
+    const partes = [
+      f.descricao,
+      f.valor_total ? reais(Number(f.valor_total)) + (f.parcelas > 1 ? ` em ${f.parcelas}x` : ' à vista') : null,
+      conta?.nome,
+      categoria?.nome,
+    ].filter(Boolean);
+    this.falar('app', `Entendi: ${partes.join(' · ')}. Confira abaixo e toque em Salvar.`);
+    const avisos: string[] = [];
+    if (s.categoria && !categoria) avisos.push(`A categoria "${s.categoria}" não está cadastrada.`);
+    if (s.conta && !conta) avisos.push(`A forma de pagamento "${s.conta}" não está cadastrada.`);
     if (s.observacao) avisos.push(s.observacao);
-    this.avisoIa.set(avisos.join(' '));
+    if (avisos.length) this.falar('aviso', avisos.join(' '));
   }
 }
 

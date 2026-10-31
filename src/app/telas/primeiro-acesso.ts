@@ -1,23 +1,27 @@
 // Cadastro inicial: renda, dia do salário, saldo, categorias e cartões. Gravar a "configuracao" libera o app
-// (guard exigeCadastroInicial). Categorias e cartões podem ser mudados depois em Cadastros.
+// (guard exigeCadastroInicial). Categorias e cartões podem ser mudados depois em Ajustes.
 import { Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
+import { mensagemDeErro } from '../nucleo/api';
 import { CATEGORIAS_SUGERIDAS, ContaCartao, Dados, TIPOS_CONTA } from '../nucleo/dados';
-import { mensagemDeErro } from '../nucleo/supabase';
+import { Icone } from '../nucleo/icone';
 
 type ContaNova = Omit<ContaCartao, 'id'>;
 
 @Component({
   selector: 'app-primeiro-acesso',
-  imports: [FormsModule],
+  imports: [FormsModule, Icone],
   template: `
     <main class="pagina">
-      <h1>Vamos começar</h1>
-      <p class="suave">Esses dados montam seu painel. Dá para mudar tudo depois.</p>
+      <div class="boas-vindas">
+        <img src="icons/icon-192x192.png" alt="" width="56" height="56" />
+        <h1>Vamos começar</h1>
+        <p class="suave">Esses dados montam seu painel. Dá para mudar tudo depois em Ajustes.</p>
+      </div>
 
       <section class="cartao">
-        <h2>Sua renda</h2>
+        <h2><app-icone nome="carteira" /> Sua renda</h2>
         <label>Renda mensal (R$) <input type="number" inputmode="decimal" step="0.01" min="0" [(ngModel)]="renda" /></label>
         <div class="linha">
           <label>Dia do salário <input type="number" inputmode="numeric" min="1" max="31" [(ngModel)]="diaSalario" /></label>
@@ -26,7 +30,7 @@ type ContaNova = Omit<ContaCartao, 'id'>;
       </section>
 
       <section class="cartao">
-        <h2>Categorias</h2>
+        <h2><app-icone nome="etiqueta" /> Categorias</h2>
         <p class="suave">Para onde vai o seu dinheiro. Desmarque o que não usa.</p>
         <div class="fichas">
           @for (c of sugeridas; track c.nome) {
@@ -50,7 +54,7 @@ type ContaNova = Omit<ContaCartao, 'id'>;
                 @if (c.dia_vencimento) { · vence dia {{ c.dia_vencimento }} }
               </small>
             </div>
-            <button class="link perigo" type="button" (click)="removerConta($index)">remover</button>
+            <button class="icone-botao perigo" type="button" (click)="removerConta($index)" aria-label="Remover"><app-icone nome="lixeira" /></button>
           </div>
         }
         <div class="linha">

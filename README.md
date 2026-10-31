@@ -1,22 +1,23 @@
 # org-fin — Organização financeira
 
 Site instalável (PWA) para registrar gastos do mês, com parcelamento automático no calendário.
-Funciona no iPhone e no Android sem loja de apps e se atualiza sozinho a cada publicação.
+Funciona no iPhone e no Android sem loja de apps, se atualiza sozinho a cada publicação e roda **só no Netlify**:
+sem banco externo nem outra conta para configurar.
 
-- **Frontend:** Angular 22 + service worker (`@angular/pwa`)
-- **Login e banco:** Supabase (Auth + Postgres com Row Level Security)
+- **Frontend:** Angular 22 + service worker (`@angular/pwa`), visual escuro com destaque verde-limão e fonte Geist
+- **Dados:** Netlify Blobs (armazenamento do próprio Netlify), um documento JSON
+- **Login:** uma senha do app (variável `APP_SENHA`), aparelho fica lembrado por 180 dias
 - **IA:** Gemini, chamado por uma Netlify Function (a chave nunca vai para o navegador)
-- **Hospedagem:** Netlify
 
 ## O que o app faz
 
-- **Primeiro acesso:** renda, dia do salário, saldo, categorias e cartões.
-- **Novo gasto:** escreva ou fale "geladeira 3 mil em 10x no Nubank, Casas Bahia" → a IA preenche → você confere → salva.
-  O formulário manual funciona sempre.
+- **Primeiro acesso:** renda, dia do salário, saldo, categorias e formas de pagamento.
+- **Novo gasto, em conversa:** escreva ou fale "geladeira 3 mil em 10x no Nubank" → a IA responde o que entendeu e
+  preenche o formulário → você confere → salva. O formulário manual funciona sempre.
 - **Parcelas:** valor total ÷ parcelas, sobra de centavos na 1ª. Cada parcela aparece no calendário do mês em que cai,
   com "Geladeira 3/10 — R$ 300,00 → Casas Bahia · Eletrodomésticos".
-- **Painel do mês:** gasto × renda, gastos por categoria e quanto dos próximos 12 meses já está comprometido.
-- **Cadastros:** renda, categorias e cartões.
+- **Painel do mês:** gasto × renda, gastos por categoria, próximos 30 dias e quanto dos próximos 12 meses já está comprometido.
+- **Ajustes:** renda, formas de pagamento, categorias e **backup** (baixar / restaurar um arquivo .json).
 
 ### Em que mês cai a 1ª parcela
 
@@ -28,75 +29,59 @@ Funciona no iPhone e no Android sem loja de apps e se atualiza sozinho a cada pu
 | Cartão com fechamento, compra **até** o dia de fechamento | mês seguinte, no dia do vencimento |
 | Cartão com fechamento, compra **depois** do fechamento | dois meses à frente |
 
-A regra está em [`src/app/dominio/parcelamento.ts`](src/app/dominio/parcelamento.ts) e tem testes (`npm run test:regras`).
+A regra está em [`src/app/dominio/parcelamento.ts`](src/app/dominio/parcelamento.ts) e é usada pelo app (prévia) e pelo
+servidor (gravação).
 
-## Publicar (uma vez só)
+## Publicar
 
-### 1. Supabase (login + banco)
-1. Crie uma conta em <https://supabase.com> → **New project** (anote a senha do banco; o app não usa, mas o Supabase pede).
-2. **SQL Editor** → cole todo o conteúdo de [`supabase/schema.sql`](supabase/schema.sql) → **Run**.
-3. **Project Settings → API**: copie a **Project URL** e a chave **anon / public**.
-4. **Authentication → URL Configuration → Site URL**: coloque o endereço do site no Netlify (passo 2), para o link de
-   confirmação do e-mail voltar para o app.
-5. Depois de criar a sua conta no app: **Authentication → Sign In / Providers → desligue "Allow new users to sign up"**,
-   para ninguém mais conseguir se cadastrar.
+1. Site importado do GitHub no Netlify (o `netlify.toml` já diz como fazer o build).
+2. **Site configuration → Environment variables**, crie:
 
-### 2. Netlify (site + função da IA)
-1. Suba esta pasta para um repositório no GitHub.
-2. Em <https://app.netlify.com> → **Add new site → Import an existing project** → escolha o repositório.
-   O `netlify.toml` já diz como fazer o build.
-3. **Site configuration → Environment variables**, crie:
+   | Variável | Valor | Secreta? |
+   |---|---|---|
+   | `APP_SENHA` | a senha para entrar no app | sim |
+   | `APP_SEGREDO` | um texto aleatório com **16 caracteres ou mais** (ex.: bata no teclado). Trocar desloga todos os aparelhos | sim |
+   | `GEMINI_API_KEY` | chave de <https://aistudio.google.com/apikey> | sim |
+   | `GEMINI_MODELOS` *(opcional)* | modelos do preferido ao reserva. Padrão: `gemini-3.1-flash-lite,gemini-3.5-flash,gemini-2.5-flash` | não |
 
-   | Variável | Valor |
-   |---|---|
-   | `SUPABASE_URL` | Project URL do Supabase |
-   | `SUPABASE_ANON_KEY` | chave anon/public do Supabase |
-   | `GEMINI_API_KEY` | chave gerada em <https://aistudio.google.com/apikey> |
-   | `GEMINI_MODELOS` *(opcional)* | lista de modelos, do preferido ao reserva. Padrão: `gemini-3.1-flash-lite,gemini-3.5-flash,gemini-2.5-flash` |
+3. **Deploys → Trigger deploy**. A cada `git push`, o Netlify publica de novo.
 
-4. **Deploys → Trigger deploy**. A cada `git push`, o Netlify publica de novo.
-
-### 3. Instalar no celular
-- **iPhone:** abra o site no **Safari** → botão **Compartilhar** → **Adicionar à Tela de Início**.
+### Instalar no celular
+- **iPhone:** abra o site no **Safari** → **Compartilhar** → **Adicionar à Tela de Início**.
 - **Android:** abra no **Chrome** → menu ⋮ → **Instalar app**.
 
-Quando sair versão nova, o app mostra **"Nova versão disponível — Atualizar"**. Os dados ficam no Supabase,
-então nada se perde ao atualizar, trocar de celular ou remover o ícone.
+Versão nova aparece como **"Nova versão disponível — Atualizar"**. Os dados ficam no Netlify: nada se perde ao
+atualizar, trocar de celular ou remover o ícone. Mesmo assim, baixe um backup de vez em quando em **Ajustes**.
 
 ## Rodar na máquina
-
-```bash
-copy .env.example .env
-```
-Preencha o `.env` com a URL e a chave anon do Supabase. Depois:
 
 ```bash
 npm install --registry=https://registry.yarnpkg.com
 ```
 ```bash
-npm start
+npm test
 ```
-Abre em <http://localhost:4200>. A IA não funciona com `npm start` (a função só existe no Netlify);
-para testá-la localmente use `npx netlify dev` com as variáveis no `.env`.
+`npm start` sobe só as telas (sem as funções, então não entra). Para o app completo use `npx netlify dev`
+com `APP_SENHA`, `APP_SEGREDO` e `GEMINI_API_KEY` num arquivo `.env` (fora do git).
 
 ## Mapa do código
 
 | Caminho | Papel |
 |---|---|
 | `src/app/dominio/parcelamento.ts` | Regra das parcelas (código puro, testado) |
-| `src/app/nucleo/` | Supabase, login/guards, acesso a dados, chamada da IA, formatação |
-| `src/app/telas/` | Uma tela por arquivo (entrar, primeiro acesso, painel, calendário, gasto, cadastros) |
+| `src/app/nucleo/` | API, login/guards, dados (cache do documento), IA, ícones, formatação |
+| `src/app/telas/` | Uma tela por arquivo (entrar, primeiro acesso, painel, calendário, gasto, ajustes) |
 | `src/styles.scss` | Todo o visual, por tokens; componentes não têm CSS próprio |
-| `supabase/schema.sql` | Tabelas, RLS e a função `salvar_compra` (grava compra + parcelas numa transação) |
+| `netlify/functions/entrar.mts` | Senha → token assinado |
+| `netlify/functions/dados.mts` | Lê/grava o documento no Netlify Blobs (com controle de gravação simultânea) |
 | `netlify/functions/interpretar-gasto.mts` | Frase → Gemini → campos do gasto |
-| `scripts/gerar-ambiente.mjs` | Gera `src/app/ambiente.ts` (URL/chave pública do Supabase) antes do build |
+| `netlify/lib/operacoes.mts` | Ações sobre os dados: validação, parcelas, backup (testado) |
+| `netlify/lib/sessao.mts` | Senha, token HMAC, resposta JSON |
 | `scripts/gerar-icones.mjs` | Gera os ícones do PWA |
 
 ### Cuidados ao mexer
-- **Segredo nunca no frontend.** Só a chave *anon* do Supabase vai para o navegador; quem protege os dados é a RLS.
-  A chave do Gemini existe só nas variáveis do Netlify.
-- **Mudou a estrutura do banco?** Crie um arquivo novo em `supabase/` (ex.: `002-....sql`) em vez de editar o antigo,
-  e rode no SQL Editor.
+- **Segredo nunca no frontend.** Senha, segredo do token e chave do Gemini só existem nas variáveis do Netlify.
+- **Um usuário por site.** Quem tem a senha vê os mesmos dados. Para outra pessoa, publique outro site.
+- **Tipos espelhados:** `src/app/nucleo/dados.ts` repete os tipos de `netlify/lib/operacoes.mts`. Mudou um, mude o outro.
 - **Datas são texto `AAAA-MM-DD`** em todo o app, para o fuso do navegador não "andar" um dia.
-- **Valores em centavos inteiros** no cálculo das parcelas; a função `salvar_compra` recusa se a soma não fechar.
-- `src/app/ambiente.ts` e `.env` são gerados/locais e ficam fora do git.
+- **Valores em centavos inteiros** no cálculo das parcelas; a soma sempre fecha com o total.

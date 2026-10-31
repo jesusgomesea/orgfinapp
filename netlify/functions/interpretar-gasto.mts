@@ -2,12 +2,13 @@
 // usando o Gemini. Existe para a chave do Gemini nunca ir para o navegador.
 //
 // Proteções:
-//  - só atende quem está logado: o token do Supabase é conferido no próprio Supabase (/auth/v1/user);
+//  - só atende quem entrou com a senha do app (token assinado);
 //  - frase limitada a 500 caracteres;
 //  - a IA só sugere — o app mostra o resultado para a pessoa conferir antes de gravar.
 //
-// Variáveis de ambiente (painel do Netlify): GEMINI_API_KEY, SUPABASE_URL, SUPABASE_ANON_KEY e,
-// opcional, GEMINI_MODELOS (lista separada por vírgula, do preferido ao reserva).
+// Variáveis de ambiente (painel do Netlify): GEMINI_API_KEY e, opcional, GEMINI_MODELOS
+// (lista separada por vírgula, do preferido ao reserva).
+import { autorizado, env, json } from '../lib/sessao.mts';
 
 const MODELOS_PADRAO = 'gemini-3.1-flash-lite,gemini-3.5-flash,gemini-2.5-flash';
 const LIMITE_FRASE = 500;
@@ -31,18 +32,10 @@ const ESQUEMA = {
 export default async (req: Request): Promise<Response> => {
   if (req.method !== 'POST') return json(405, { erro: 'Use POST.' });
 
-  const env = (nome: string) => process.env[nome] ?? '';
-  if (!env('GEMINI_API_KEY') || !env('SUPABASE_URL') || !env('SUPABASE_ANON_KEY')) {
-    return json(500, { erro: 'Servidor sem configuração da IA (variáveis do Netlify).' });
-  }
+  if (!env('GEMINI_API_KEY')) return json(500, { erro: 'Falta a variável GEMINI_API_KEY no Netlify.' });
 
-  // 1) Quem está chamando?
-  const token = (req.headers.get('authorization') ?? '').replace(/^Bearer\s+/i, '');
-  if (!token) return json(401, { erro: 'Entre na sua conta para usar a IA.' });
-  const usuario = await fetch(`${env('SUPABASE_URL')}/auth/v1/user`, {
-    headers: { apikey: env('SUPABASE_ANON_KEY'), Authorization: `Bearer ${token}` },
-  });
-  if (!usuario.ok) return json(401, { erro: 'Sessão expirada. Entre de novo.' });
+  // 1) Quem está chamando? (mesmo token do login, ver netlify/lib/sessao.mts)
+  if (!autorizado(req)) return json(401, { erro: 'Sessão expirada. Entre de novo.' });
 
   // 2) Pedido
   const corpo = (await req.json().catch(() => null)) as
@@ -119,9 +112,3 @@ function limpar(s: Record<string, unknown>, categorias: string[], contas: string
     observacao: texto(s['observacao']),
   };
 }
-
-function json(status: number, corpo: unknown): Response {
-  return new Response(JSON.stringify(corpo), { status, headers: { 'Content-Type': 'application/json; charset=utf-8' } });
-}
-
-declare const process: { env: Record<string, string | undefined> };

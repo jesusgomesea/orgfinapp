@@ -1,38 +1,35 @@
-// Tela de login / criação de conta (Supabase Auth, e-mail + senha).
+// Tela de entrada: só a senha do app (variável APP_SENHA no Netlify). Depois de entrar, o aparelho fica
+// lembrado por 180 dias.
 import { Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
+import { mensagemDeErro } from '../nucleo/api';
 import { Auth } from '../nucleo/auth';
-import { mensagemDeErro, supabaseConfigurado } from '../nucleo/supabase';
+import { Icone } from '../nucleo/icone';
 
 @Component({
   selector: 'app-entrar',
-  imports: [FormsModule],
+  imports: [FormsModule, Icone],
   template: `
-    <main class="centro">
-      <form class="cartao estreito" (ngSubmit)="enviar()">
-        <h1 class="marca">org<span>fin</span></h1>
-        <p class="suave">{{ criando() ? 'Crie sua conta' : 'Entre para ver suas finanças' }}</p>
+    <main class="entrada">
+      <div class="entrada-marca">
+        <img src="icons/icon-192x192.png" alt="" width="56" height="56" />
+        <span class="marca">org<span>fin</span></span>
+        <h1>Seu dinheiro,<br />mês a mês.</h1>
+        <p>Conte o que gastou. O resto a gente organiza.</p>
+      </div>
 
-        @if (!configurado) {
-          <p class="aviso erro">Supabase não configurado. Veja o README (SUPABASE_URL / SUPABASE_ANON_KEY).</p>
-        }
-
-        <label>E-mail <input type="email" name="email" [(ngModel)]="email" autocomplete="email" required /></label>
+      <form class="cartao" (ngSubmit)="enviar()">
         <label>
-          Senha
-          <input type="password" name="senha" [(ngModel)]="senha" required minlength="6"
-                 [attr.autocomplete]="criando() ? 'new-password' : 'current-password'" />
+          Senha do app
+          <span class="campo-icone">
+            <app-icone nome="cadeado" />
+            <input type="password" name="senha" [(ngModel)]="senha" autocomplete="current-password" required autofocus />
+          </span>
         </label>
-
         @if (erro()) { <p class="aviso erro">{{ erro() }}</p> }
-        @if (info()) { <p class="aviso ok">{{ info() }}</p> }
-
-        <button class="primario" type="submit" [disabled]="ocupado()">
-          {{ ocupado() ? 'Aguarde…' : criando() ? 'Criar conta' : 'Entrar' }}
-        </button>
-        <button class="link" type="button" (click)="criando.set(!criando()); erro.set('')">
-          {{ criando() ? 'Já tenho conta' : 'Ainda não tenho conta' }}
+        <button class="primario largo" type="submit" [disabled]="ocupado() || !senha">
+          {{ ocupado() ? 'Entrando…' : 'Entrar' }}
         </button>
       </form>
     </main>
@@ -42,32 +39,15 @@ export class Entrar {
   private readonly auth = inject(Auth);
   private readonly router = inject(Router);
 
-  protected readonly configurado = supabaseConfigurado;
-  protected email = '';
   protected senha = '';
-  protected readonly criando = signal(false);
   protected readonly ocupado = signal(false);
   protected readonly erro = signal('');
-  protected readonly info = signal('');
 
   protected async enviar() {
     this.erro.set('');
-    this.info.set('');
     this.ocupado.set(true);
     try {
-      if (this.criando()) {
-        const { data, error } = await this.auth.criarConta(this.email.trim(), this.senha);
-        if (error) throw error;
-        // Com confirmação de e-mail ligada no Supabase, ainda não há sessão: precisa clicar no link.
-        if (!data.session) {
-          this.info.set('Conta criada! Abra o link que enviamos para o seu e-mail e depois entre aqui.');
-          this.criando.set(false);
-          return;
-        }
-      } else {
-        const { error } = await this.auth.entrar(this.email.trim(), this.senha);
-        if (error) throw error;
-      }
+      await this.auth.entrar(this.senha);
       await this.router.navigateByUrl('/');
     } catch (e) {
       this.erro.set(mensagemDeErro(e));
