@@ -101,6 +101,7 @@ export const CATEGORIAS_SUGERIDAS: { nome: string; cor: string }[] = [
   { nome: 'Educação', cor: '#7c3aed' },
   { nome: 'Lazer', cor: '#ca8a04' },
   { nome: 'Eletrodomésticos', cor: '#475569' },
+  { nome: 'Eletrônicos', cor: '#0ea5e9' },
   { nome: 'Vestuário', cor: '#9333ea' },
   { nome: 'Outros', cor: '#64748b' },
 ];

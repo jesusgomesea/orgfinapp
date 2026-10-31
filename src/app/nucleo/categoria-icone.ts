@@ -14,7 +14,9 @@ const PALAVRAS: [RegExp, NomeIcone][] = [
   [/saúde|saude|farmác|farmac|médic|medic|academia|dentist/i, 'coracao'],
   [/educa|escola|curso|faculd|livro/i, 'livro'],
   [/lazer|cinema|show|streaming|jogo|festa|música|musica/i, 'musica'],
-  [/eletro|eletrôn|eletron|móve|move/i, 'tomada'],
+  // "Eletrônicos" antes de "Eletrodomésticos": os dois começam com "eletro".
+  [/eletr[oô]nic|celular|smartphone|notebook|computador|inform[aá]tica|games?\b/i, 'celular'],
+  [/eletro|móve|move/i, 'tomada'],
   [/vestu|roupa|calçad|calcad|moda/i, 'camiseta'],
   [/pet|cachorr|gato|veterin/i, 'pata'],
   [/viage|passage|hotel|turism/i, 'aviao'],
