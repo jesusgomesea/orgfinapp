@@ -11,7 +11,7 @@ import { mensagemDeErro } from '../nucleo/api';
 import { Categoria, CompraForm, ContaCartao, Dados } from '../nucleo/dados';
 import { dataCurta, hoje, nomeMesCurto, reais } from '../nucleo/formato';
 import { Avisos } from '../nucleo/avisos';
-import { Ia, SugestaoGasto } from '../nucleo/ia';
+import { Foto, Ia, SugestaoGasto, prepararFoto } from '../nucleo/ia';
 import { Icone } from '../nucleo/icone';
 
 // Reconhecimento de voz do navegador (Chrome/Android e Safari). Onde não existir, o ditado do teclado resolve.
@@ -37,7 +37,10 @@ const PARCELAS_RAPIDAS = [1, 2, 3, 6, 10, 12];
     @if (!editando()) {
       <div class="conversa" aria-live="polite">
         @for (m of mensagens(); track $index) {
-          <div class="balao" [class.app]="m.de !== 'voce'" [class.voce]="m.de === 'voce'" [class.aviso-ia]="m.de === 'aviso'">{{ m.texto }}</div>
+          <div class="balao" [class.app]="m.de !== 'voce'" [class.voce]="m.de === 'voce'" [class.aviso-ia]="m.de === 'aviso'">
+            @if (m.foto) { <img class="balao-foto" [src]="m.foto" alt="Foto do comprovante" /> }
+            {{ m.texto }}
+          </div>
         }
         @if (lendo()) { <div class="balao app digitando" aria-label="Lendo"><i></i><i></i><i></i></div> }
       </div>
@@ -45,6 +48,10 @@ const PARCELAS_RAPIDAS = [1, 2, 3, 6, 10, 12];
       <div class="compositor">
         <textarea rows="1" [(ngModel)]="frase" name="frase" placeholder="O que você gastou?"
                   (keydown.enter)="enviarFrase($event)" aria-label="Descreva o gasto"></textarea>
+        <label class="icone-botao" title="Foto do comprovante" aria-label="Enviar foto do comprovante">
+          <app-icone nome="camera" />
+          <input type="file" accept="image/*" hidden (change)="enviarFoto($event)" />
+        </label>
         @if (temVoz) {
           <button type="button" class="icone-botao" (click)="ouvir()" [class.gravando]="ouvindo()" aria-label="Falar">
             <app-icone nome="microfone" />
@@ -168,8 +175,8 @@ export class Gasto implements OnInit {
   protected readonly salvando = signal(false);
   protected readonly erro = signal('');
   /** Conversa com a IA: o app pergunta, a pessoa descreve, o app resume o que entendeu. */
-  protected readonly mensagens = signal<{ de: 'app' | 'voce' | 'aviso'; texto: string }[]>([
-    { de: 'app', texto: 'Me conta o que você gastou, do seu jeito. Eu preencho os detalhes pra você conferir.' },
+  protected readonly mensagens = signal<{ de: 'app' | 'voce' | 'aviso'; texto: string; foto?: string }[]>([
+    { de: 'app', texto: 'Me conta o que você gastou, do seu jeito, ou manda a foto do cupom/comprovante. Eu preencho os detalhes pra você conferir.' },
   ]);
   protected frase = '';
   protected form: CompraForm = {
@@ -241,13 +248,27 @@ export class Gasto implements OnInit {
     if (this.frase.trim() && !this.lendo()) this.interpretar();
   }
 
-  protected async interpretar() {
+  /** Foto do comprovante: reduz no aparelho, mostra na conversa e manda para a IA junto com o que estiver escrito. */
+  protected async enviarFoto(evento: Event) {
+    const campo = evento.target as HTMLInputElement;
+    const arquivo = campo.files?.[0];
+    campo.value = '';
+    if (!arquivo || this.lendo()) return;
+    try {
+      const foto = await prepararFoto(arquivo);
+      await this.interpretar(foto);
+    } catch (e) {
+      this.falar('aviso', mensagemDeErro(e));
+    }
+  }
+
+  protected async interpretar(foto?: Foto) {
     const frase = this.frase.trim();
-    this.falar('voce', frase);
+    this.mensagens.update((l) => [...l, { de: 'voce', texto: frase || (foto ? 'Lê esse comprovante pra mim' : ''), foto: foto ? 'data:' + foto.mime + ';base64,' + foto.base64 : undefined }]);
     this.frase = '';
     this.lendo.set(true);
     try {
-      const s = await this.ia.interpretar(frase, this.categorias().map((c) => c.nome), this.contas().map((c) => c.nome));
+      const s = await this.ia.interpretar(frase, this.categorias().map((c) => c.nome), this.contas().map((c) => c.nome), foto);
       this.aplicar(s);
     } catch (e) {
       this.falar('aviso', mensagemDeErro(e));
@@ -282,8 +303,16 @@ export class Gasto implements OnInit {
   protected async excluir() {
     if (!this.form.id || !confirm('Excluir este gasto e todas as parcelas dele?')) return;
     try {
-      await this.dados.excluirCompra(this.form.id);
-      this.avisos.mostrar('Gasto excluído');
+      const antes = await this.dados.excluirCompra(this.form.id);
+      // "Desfazer" recria a compra com os mesmos dados (as parcelas são recalculadas iguais).
+      this.avisos.mostrar('Gasto excluído', 'ok', 6000, antes ? {
+        rotulo: 'Desfazer',
+        executar: async () => {
+          const { id: _, ...semId } = antes;
+          await this.dados.salvarCompra(semId);
+          this.avisos.mostrar('Gasto restaurado');
+        },
+      } : undefined);
       await this.router.navigateByUrl('/calendario');
     } catch (e) {
       this.erro.set(mensagemDeErro(e));

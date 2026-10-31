@@ -1,6 +1,8 @@
 // Moldura das telas logadas. A MESMA navegação muda de forma pelo CSS (styles.scss, "responsivo"):
-//  - celular e tablet: barra flutuante embaixo, com o "+" no meio;
-//  - desktop (≥ 1100px): menu lateral fixo com a marca, os links e o botão "Novo gasto".
+//  - celular e tablet: barra flutuante embaixo (Painel, Calendário, +, Relatórios, Mais);
+//  - celular deitado: trilho vertical só com ícones;
+//  - desktop (≥ 1100px): menu lateral com todas as telas (.so-desktop) e o botão "Novo gasto".
+// "Mais" (.so-celular) abre a tela /mais com Cofres, Fixos, Assistente, Ajustes e Sair.
 // Atalho de teclado no desktop: N abre um novo gasto (fora de campos de texto).
 import { Component, HostListener, inject } from '@angular/core';
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
@@ -22,8 +24,13 @@ import { Icone } from '../nucleo/icone';
       <a routerLink="/gasto/novo" class="mais" aria-label="Novo gasto" title="Novo gasto (N)">
         <span class="mais-icone"><app-icone nome="mais" /></span><span class="mais-texto">Novo gasto</span>
       </a>
-      <a routerLink="/cadastros" routerLinkActive="ativa" ariaCurrentWhenActive="page"><app-icone nome="ajustes" /><span>Ajustes</span></a>
-      <button type="button" class="nav-sair" (click)="sair()"><app-icone nome="sair" /><span>Sair</span></button>
+      <a routerLink="/relatorios" routerLinkActive="ativa" ariaCurrentWhenActive="page"><app-icone nome="grafico" /><span>Relatórios</span></a>
+      <a class="so-desktop" routerLink="/cofres" routerLinkActive="ativa" ariaCurrentWhenActive="page"><app-icone nome="cofre" /><span>Cofres</span></a>
+      <a class="so-desktop" routerLink="/fixos" routerLinkActive="ativa" ariaCurrentWhenActive="page"><app-icone nome="repetir" /><span>Fixos e entradas</span></a>
+      <a class="so-desktop" routerLink="/assistente" routerLinkActive="ativa" ariaCurrentWhenActive="page"><app-icone nome="conversa" /><span>Assistente</span></a>
+      <a class="so-desktop" routerLink="/cadastros" routerLinkActive="ativa" ariaCurrentWhenActive="page"><app-icone nome="ajustes" /><span>Ajustes</span></a>
+      <a class="so-celular" routerLink="/mais" routerLinkActive="ativa" ariaCurrentWhenActive="page"><app-icone nome="menu" /><span>Mais</span></a>
+      <button type="button" class="nav-sair so-desktop" (click)="sair()"><app-icone nome="sair" /><span>Sair</span></button>
     </nav>
     <main class="app">
       <router-outlet />
@@ -31,6 +38,7 @@ import { Icone } from '../nucleo/icone';
     @if (avisos.atual(); as a) {
       <div class="toast" [class.erro]="a.tipo === 'erro'" role="status">
         <app-icone [nome]="a.tipo === 'erro' ? 'alerta' : 'check'" /> {{ a.texto }}
+        @if (a.acao) { <button type="button" class="toast-acao" (click)="avisos.executarAcao()">{{ a.acao.rotulo }}</button> }
       </div>
     }
   `,
@@ -38,9 +46,8 @@ import { Icone } from '../nucleo/icone';
 export class Estrutura {
   private readonly auth = inject(Auth);
   private readonly router = inject(Router);
-  protected readonly avisos = inject(Avisos);
-
   private readonly dados = inject(Dados);
+  protected readonly avisos = inject(Avisos);
 
   constructor() {
     // Voltou para o app (trocou de aba ou desbloqueou o celular): traz o que outro aparelho lançou.

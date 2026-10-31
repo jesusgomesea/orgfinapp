@@ -4,7 +4,7 @@
 // Gravação com "onlyIfMatch" (etag): se dois aparelhos salvarem ao mesmo tempo, um tenta de novo em cima do
 // dado mais novo em vez de apagar o do outro.
 import { getStore } from '@netlify/blobs';
-import { aplicar, bancoVazio, ErroDeRegra, type Acao, type Banco } from '../lib/operacoes.mts';
+import { aplicar, bancoVazio, ErroDeRegra, normalizar, type Acao, type Banco } from '../lib/operacoes.mts';
 import { autorizado, json, problemaDeConfiguracao } from '../lib/sessao.mts';
 
 const CHAVE = 'banco';
@@ -20,7 +20,7 @@ export default async (req: Request): Promise<Response> => {
 
   if (req.method === 'GET') {
     const atual = await loja.get(CHAVE, { type: 'json' });
-    return json(200, (atual as Banco | null) ?? bancoVazio());
+    return json(200, atual ? normalizar(atual as Banco) : bancoVazio());
   }
   if (req.method !== 'POST') return json(405, { erro: 'Use GET ou POST.' });
 

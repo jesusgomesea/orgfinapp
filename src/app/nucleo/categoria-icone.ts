@@ -5,6 +5,8 @@ import { Component, computed, input } from '@angular/core';
 import { Icone, NomeIcone } from './icone';
 
 const PALAVRAS: [RegExp, NomeIcone][] = [
+  [/^entrada/i, 'carteira'],
+  [/assinatura|netflix|spotify|prime|disney|youtube/i, 'repetir'],
   [/mercad|supermerc|feira|hortifr|padari|açougue|acougue/i, 'carrinho'],
   // "Contas da casa" tem que cair em contas, não em moradia: por isso esta linha vem antes.
   [/conta|luz|energia|água|agua|internet|telefon|celular|\bg[aá]s\b/i, 'raio'],

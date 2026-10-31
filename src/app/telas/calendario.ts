@@ -1,13 +1,14 @@
 // Calendário do mês: grade com o total de cada dia e, abaixo, os gastos agrupados por dia, com o detalhe de cada
-// parcela ("Geladeira 3/10 — R$ 300,00 → Casas Bahia · Eletrodomésticos"). Usa data_prevista (o dia em que cai).
+// parcela ("Geladeira 3/10 — R$ 300,00 → Casas Bahia · Eletrodomésticos"), fixos e entradas, com o botão de pago.
+// Usa data_prevista (o dia em que cai). Entradas aparecem na lista mas não somam nos gastos.
 import { Component, computed, effect, inject, input, signal, untracked } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { diasNoMes, formatar, lerData } from '../dominio/parcelamento';
 import { mensagemDeErro } from '../nucleo/api';
-import { IconeCategoria } from '../nucleo/categoria-icone';
-import { Dados, LancamentoDetalhado } from '../nucleo/dados';
+import { Dados, LancamentoDetalhado, ehEntrada, ehGasto } from '../nucleo/dados';
 import { NOMES_MES, hoje, mesAtual, navegarMes, reais } from '../nucleo/formato';
 import { Icone } from '../nucleo/icone';
+import { ItemLancamento } from '../nucleo/item-lancamento';
 
 const DIAS_SEMANA = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 
@@ -21,7 +22,7 @@ interface Dia {
 @Component({
   selector: 'app-calendario',
   host: { class: 'tela tela-calendario' },
-  imports: [RouterLink, Icone, IconeCategoria],
+  imports: [RouterLink, Icone, ItemLancamento],
   template: `
     <header class="topo">
       <h1>Calendário</h1>
@@ -41,10 +42,10 @@ interface Dia {
         @for (v of vazios(); track $index) { <span></span> }
         @for (d of dias(); track d.data) {
           <button type="button" class="dia" [class.hoje]="d.data === hoje" [class.selecionado]="d.data === selecionado()"
-                  [class.com-gasto]="d.total > 0" (click)="selecionar(d.data)" [attr.aria-pressed]="d.data === selecionado()"
+                  [class.com-gasto]="d.cores.length > 0" (click)="selecionar(d.data)" [attr.aria-pressed]="d.data === selecionado()"
                   [attr.aria-label]="d.numero + (d.total ? ', ' + reais(d.total) : '')">
             <span class="numero">{{ d.numero }}</span>
-            @if (d.total > 0) {
+            @if (d.cores.length) {
               <span class="pontos">@for (c of d.cores; track $index) { <i [style.background]="c"></i> }</span>
             }
           </button>
@@ -52,7 +53,10 @@ interface Dia {
       </div>
       <div class="rodape-grade">
         <span class="suave">{{ lancamentos().length }} lançamento(s)</span>
-        <span>Total <strong>{{ reais(totalMes()) }}</strong></span>
+        <span>
+          @if (entradasMes() > 0) { <span class="positivo">+ {{ reais(entradasMes()) }}</span> · }
+          Gastos <strong>{{ reais(totalMes()) }}</strong>
+        </span>
       </div>
     </section>
     </div>
@@ -74,21 +78,7 @@ interface Dia {
       <section class="grupo-dia">
         <h3><span>{{ rotuloDia(g.data) }}</span><span>{{ reais(g.total) }}</span></h3>
         <div class="cartao lista">
-          @for (l of g.itens; track l.id) {
-            <a class="linha-lancamento" [routerLink]="['/gasto', l.compra.id]">
-              <app-icone-categoria [nome]="l.compra.categoria?.nome" [cor]="l.compra.categoria?.cor" />
-              <span class="texto">
-                <strong>{{ l.compra.descricao }} @if (l.total_parcelas > 1) { <span class="parcela">{{ l.numero }}/{{ l.total_parcelas }}</span> }</strong>
-                <small class="suave">
-                  @if (l.compra.estabelecimento) { → {{ l.compra.estabelecimento }} · }
-                  {{ l.compra.categoria?.nome ?? 'Sem categoria' }}
-                  @if (l.compra.conta_cartao) { · {{ l.compra.conta_cartao.nome }} }
-                </small>
-                @if (l.total_parcelas > 1) { <small class="suave">Total da compra {{ reais(l.compra.valor_total) }}</small> }
-              </span>
-              <strong class="valor">{{ reais(l.valor) }}</strong>
-            </a>
-          }
+          @for (l of g.itens; track l.chave) { <app-item [item]="l" /> }
         </div>
       </section>
     } @empty {
@@ -120,7 +110,8 @@ export class Calendario {
   protected readonly titulo = computed(() => `${NOMES_MES[this.mes().mes - 1].slice(0, 3)} ${this.mes().ano}`);
   /** Casas vazias antes do dia 1 (domingo = 0). */
   protected readonly vazios = computed(() => Array(new Date(this.mes().ano, this.mes().mes - 1, 1).getDay()));
-  protected readonly totalMes = computed(() => this.lancamentos().reduce((t, l) => t + l.valor, 0));
+  protected readonly totalMes = computed(() => this.lancamentos().filter(ehGasto).reduce((t, l) => t + l.valor, 0));
+  protected readonly entradasMes = computed(() => this.lancamentos().filter(ehEntrada).reduce((t, l) => t + l.valor, 0));
 
   protected readonly dias = computed<Dia[]>(() => {
     const { ano, mes } = this.mes();
@@ -128,7 +119,7 @@ export class Calendario {
       const data = formatar(ano, mes, i + 1);
       const doDia = this.lancamentos().filter((l) => l.data_prevista === data);
       const cores = [...new Set(doDia.map((l) => l.compra.categoria?.cor ?? '#94a3b8'))].slice(0, 3);
-      return { data, numero: i + 1, total: doDia.reduce((t, l) => t + l.valor, 0), cores };
+      return { data, numero: i + 1, total: doDia.filter(ehGasto).reduce((t, l) => t + l.valor, 0), cores };
     });
   });
 
@@ -140,7 +131,7 @@ export class Calendario {
       .filter((l) => !termo || semAcento(`${l.compra.descricao} ${l.compra.estabelecimento ?? ''} ${l.compra.categoria?.nome ?? ''} ${l.compra.conta_cartao?.nome ?? ''}`).includes(termo));
     const mapa = new Map<string, LancamentoDetalhado[]>();
     for (const l of lista) mapa.set(l.data_prevista, [...(mapa.get(l.data_prevista) ?? []), l]);
-    return [...mapa].map(([data, itens]) => ({ data, itens, total: itens.reduce((t, l) => t + l.valor, 0) }));
+    return [...mapa].map(([data, itens]) => ({ data, itens, total: itens.filter(ehGasto).reduce((t, l) => t + l.valor, 0) }));
   });
 
   constructor() {

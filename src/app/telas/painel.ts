@@ -1,24 +1,28 @@
-// Painel do mês, no estilo de app de banco: cartão principal com gradiente (gasto × renda, número animado),
-// atalhos, cartões de crédito desenhados com a fatura do mês, gastos por categoria (rosca), próximos vencimentos
-// e quanto dos próximos meses já está comprometido. Totais usam "competencia" (o mês em que o gasto conta).
+// Painel do mês, no estilo de app de banco:
+//  - cartão principal: gasto do mês × renda (salário + entradas do mês), número animado, "Disponível" e "Falta pagar";
+//  - atalhos; alertas de limite por categoria; faturas dos cartões (tocar abre a fatura); resumo dos cofres;
+//  - gastos por categoria (rosca + limite), próximos vencimentos (com "pago") e o que já está comprometido.
+// Totais usam "competencia" (o mês em que o gasto conta). Entradas NÃO entram no total de gastos.
 // O olhinho esconde os valores (Privacidade).
 import { Component, computed, effect, inject, signal, untracked } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { formatar, lerData } from '../dominio/parcelamento';
 import { mensagemDeErro } from '../nucleo/api';
 import { IconeCategoria } from '../nucleo/categoria-icone';
-import { Configuracao, ContaCartao, Dados, LancamentoDetalhado } from '../nucleo/dados';
+import { Categoria, CofreResumo, Configuracao, ContaCartao, Dados, LancamentoDetalhado, ehEntrada, ehGasto } from '../nucleo/dados';
 import { NOMES_MES, gradienteDoCartao, hoje, mesAtual, navegarMes, nomeMesCurto, primeiroDia } from '../nucleo/formato';
 import { Icone } from '../nucleo/icone';
+import { ItemLancamento } from '../nucleo/item-lancamento';
 import { Privacidade } from '../nucleo/privacidade';
 
 const MESES_A_FRENTE = 12;
 const DIAS_PROXIMOS = 30;
+const ALERTA_LIMITE = 0.8;
 
 @Component({
   selector: 'app-painel',
   host: { class: 'tela tela-painel' },
-  imports: [RouterLink, Icone, IconeCategoria],
+  imports: [RouterLink, Icone, IconeCategoria, ItemLancamento],
   template: `
     <header class="topo">
       <div>
@@ -53,44 +57,72 @@ const DIAS_PROXIMOS = 30;
       <strong class="valor-grande">{{ priv.mostrar(totalAnimado()) }}</strong>
       @if (renda() > 0) {
         <div class="barra vidro" [class.estourou]="percentual() > 100"><span [style.width.%]="percentualBarra()"></span></div>
-        <small>{{ percentual() }}% da renda de {{ priv.mostrar(renda()) }}</small>
+        <small>
+          {{ percentual() }}% da renda de {{ priv.mostrar(renda()) }}
+          @if (entradasMes() > 0) { (com {{ priv.mostrar(entradasMes()) }} de entradas) }
+        </small>
       }
       <div class="numeros">
         <div class="vidro">
           <small>{{ sobra() >= 0 ? 'Disponível' : 'Acima da renda' }}</small>
           <strong [class.alerta]="sobra() < 0">{{ renda() > 0 ? priv.mostrar(abs(sobra())) : '—' }}</strong>
+          @if (guardadoMes() > 0) { <small>já tirando {{ priv.mostrar(guardadoMes()) }} guardados</small> }
         </div>
         <div class="vidro">
-          <small>Parcelas a vencer</small>
-          <strong>{{ priv.mostrar(totalFuturo()) }}</strong>
+          <small>Falta pagar no mês</small>
+          <strong>{{ priv.mostrar(faltaPagar()) }}</strong>
+          <small>{{ priv.mostrar(pagoMes()) }} já pagos</small>
         </div>
       </div>
     </section>
 
     <nav class="atalhos" aria-label="Atalhos">
       <a routerLink="/gasto/novo"><span><app-icone nome="brilho" /></span>Lançar</a>
-      <a routerLink="/calendario"><span><app-icone nome="calendario" /></span>Calendário</a>
-      <a routerLink="/cadastros" fragment="cartoes"><span><app-icone nome="cartao" /></span>Cartões</a>
-      <a routerLink="/cadastros" fragment="backup"><span><app-icone nome="baixar" /></span>Backup</a>
+      <a routerLink="/fixos"><span><app-icone nome="repetir" /></span>Fixos</a>
+      <a routerLink="/cofres"><span><app-icone nome="cofre" /></span>Cofres</a>
+      <a routerLink="/assistente"><span><app-icone nome="conversa" /></span>Perguntar</a>
     </nav>
+
+    @for (a of alertas(); track a.nome) {
+      <a class="alerta-limite" [class.estourou]="a.pct >= 100" routerLink="/calendario">
+        <app-icone-categoria [nome]="a.nome" [cor]="a.cor" />
+        <span>
+          <strong>{{ a.nome }}: {{ a.pct }}% do limite</strong>
+          <small>{{ priv.mostrar(a.total) }} de {{ priv.mostrar(a.limite) }}{{ a.pct >= 100 ? ' — passou do limite' : '' }}</small>
+        </span>
+        <app-icone nome="alerta" />
+      </a>
+    }
 
     @if (cartoes().length) {
       <h2 class="secao">Faturas de {{ nomeMes().toLowerCase() }}</h2>
       <div class="carrossel">
         @for (c of cartoes(); track c.id) {
-          <div class="cartao-credito" [style.background]="c.fundo">
-            <div class="cc-topo"><strong>{{ c.nome }}</strong><app-icone nome="cartao" /></div>
+          <a class="cartao-credito" [style.background]="c.fundo" [routerLink]="['/fatura', c.id]" [queryParams]="{ m: mesChave() }">
+            <div class="cc-topo"><strong>{{ c.nome }}</strong>@if (c.paga) { <span class="selo-pago"><app-icone nome="check" /> paga</span> } @else { <app-icone nome="cartao" /> }</div>
             <span class="cc-chip"></span>
             <div>
               <small>Fatura do mês</small>
               <strong class="cc-valor">{{ priv.mostrar(c.fatura) }}</strong>
             </div>
-            <small>{{ c.vencimento ? 'Vence dia ' + c.vencimento : 'Sem vencimento cadastrado' }}</small>
-          </div>
+            <small>{{ c.vencimento ? 'Vence dia ' + c.vencimento : 'Sem vencimento cadastrado' }} · ver fatura</small>
+          </a>
         }
       </div>
     }
 
+    @if (cofres().length) {
+      <a class="cartao cofres-resumo" routerLink="/cofres">
+        <div class="linha-texto"><h2><app-icone nome="cofre" /> Cofres</h2><strong>{{ priv.mostrar(totalCofres()) }}</strong></div>
+        @for (c of cofres().slice(0, 3); track c.id) {
+          <div class="cofre-mini">
+            <span class="nome"><span class="bolinha" [style.background]="c.cor"></span>{{ c.nome }}</span>
+            <span>{{ priv.mostrar(c.saldo) }}@if (c.meta_valor) { <small class="suave"> / {{ priv.mostrar(c.meta_valor) }}</small> }</span>
+            @if (c.meta_valor) { <span class="barra fina"><span [style.width.%]="min(100, (c.saldo / c.meta_valor) * 100)" [style.background]="c.cor"></span></span> }
+          </div>
+        }
+      </a>
+    }
     </div>
 
     <div class="col-lateral">
@@ -112,7 +144,15 @@ const DIAS_PROXIMOS = 30;
             @for (c of porCategoria(); track c.nome) {
               <li>
                 <app-icone-categoria [nome]="c.nome" [cor]="c.cor" />
-                <span class="nome">{{ c.nome }}<span class="barra fina"><span [style.width.%]="pct(c.total)" [style.background]="c.cor"></span></span></span>
+                <span class="nome">
+                  {{ c.nome }}
+                  @if (c.limite) {
+                    <span class="barra fina" [class.estourou]="c.total > c.limite"><span [style.width.%]="min(100, (c.total / c.limite) * 100)" [style.background]="c.total > c.limite ? null : c.cor"></span></span>
+                    <small class="suave">limite {{ priv.mostrar(c.limite) }}</small>
+                  } @else {
+                    <span class="barra fina"><span [style.width.%]="pct(c.total)" [style.background]="c.cor"></span></span>
+                  }
+                </span>
                 <span class="direita"><strong>{{ priv.mostrar(c.total) }}</strong><small>{{ pct(c.total) }}%</small></span>
               </li>
             }
@@ -126,17 +166,10 @@ const DIAS_PROXIMOS = 30;
       }
     </section>
 
-    <section class="cartao">
+    <section class="cartao lista">
       <h2>Próximos {{ diasProximos }} dias</h2>
-      @for (l of proximos(); track l.id) {
-        <a class="linha-lancamento" [routerLink]="['/gasto', l.compra.id]">
-          <app-icone-categoria [nome]="l.compra.categoria?.nome" [cor]="l.compra.categoria?.cor" />
-          <span class="texto">
-            <strong>{{ l.compra.descricao }} @if (l.total_parcelas > 1) { <span class="parcela">{{ l.numero }}/{{ l.total_parcelas }}</span> }</strong>
-            <small class="suave">{{ quando(l.data_prevista) }} · {{ l.compra.estabelecimento ?? l.compra.categoria?.nome ?? '' }}</small>
-          </span>
-          <strong class="valor">{{ priv.mostrar(l.valor) }}</strong>
-        </a>
+      @for (l of proximos(); track l.chave) {
+        <app-item [item]="l" [comData]="true" [completo]="false" />
       } @empty {
         <p class="suave">Nada previsto.</p>
       }
@@ -144,7 +177,7 @@ const DIAS_PROXIMOS = 30;
 
     <section class="cartao">
       <h2>Já comprometido</h2>
-      <p class="suave">Parcelas que vão cair nos próximos meses, de compras já feitas.</p>
+      <p class="suave">Parcelas e fixos que vão cair nos próximos meses.</p>
       <div class="colunas">
         @for (m of futuro(); track m.competencia) {
           <div class="coluna" [title]="priv.mostrar(m.total)">
@@ -163,26 +196,45 @@ export class Painel {
   protected readonly priv = inject(Privacidade);
 
   protected readonly abs = Math.abs;
+  protected readonly min = Math.min;
   protected readonly nomeMesCurto = nomeMesCurto;
   protected readonly diasProximos = DIAS_PROXIMOS;
   protected readonly saudacao = saudacao();
   protected readonly mes = signal(mesAtual());
   protected readonly config = signal<Configuracao | null>(null);
   protected readonly contas = signal<ContaCartao[]>([]);
-  protected readonly doMes = signal<LancamentoDetalhado[]>([]);
+  protected readonly categorias = signal<Categoria[]>([]);
+  protected readonly cofres = signal<CofreResumo[]>([]);
+  /** Tudo do mês (gastos e entradas). */
+  protected readonly itensMes = signal<LancamentoDetalhado[]>([]);
   protected readonly aVencer = signal<LancamentoDetalhado[]>([]);
   protected readonly proximos = signal<LancamentoDetalhado[]>([]);
   protected readonly erro = signal('');
-  /** Valor exibido no cartão principal: sobe até o total (efeito "contador"). */
   protected readonly totalAnimado = signal(0);
+  protected readonly totalAnterior = signal(0);
   private pedido = 0;
 
+  protected readonly doMes = computed(() => this.itensMes().filter(ehGasto));
   protected readonly nomeMes = computed(() => NOMES_MES[this.mes().mes - 1]);
+  protected readonly mesChave = computed(() => primeiroDia(this.mes().ano, this.mes().mes).slice(0, 7));
   protected readonly titulo = computed(() => `${this.nomeMes().slice(0, 3)} ${this.mes().ano}`);
-  protected readonly renda = computed(() => Number(this.config()?.renda_mensal ?? 0));
+  protected readonly entradasMes = computed(() => soma(this.itensMes().filter(ehEntrada)));
+  protected readonly renda = computed(() => Number(this.config()?.renda_mensal ?? 0) + this.entradasMes());
   protected readonly totalMes = computed(() => soma(this.doMes()));
+  protected readonly pagoMes = computed(() => soma(this.doMes().filter((l) => l.pago)));
+  protected readonly faltaPagar = computed(() => Math.max(0, this.totalMes() - this.pagoMes()));
   protected readonly totalFuturo = computed(() => soma(this.aVencer()));
-  protected readonly totalAnterior = signal(0);
+  /** Quanto foi para os cofres neste mês (depósitos menos retiradas): sai do "Disponível". */
+  protected readonly guardadoMes = computed(() => {
+    const chave = this.mesChave();
+    const v = this.cofres().flatMap((c) => c.movimentos).filter((m) => m.data.startsWith(chave)).reduce((t, m) => t + m.valor, 0);
+    return Math.round(v * 100) / 100;
+  });
+  protected readonly sobra = computed(() => this.renda() - this.totalMes() - this.guardadoMes());
+  protected readonly totalCofres = computed(() => this.cofres().reduce((t, c) => t + c.saldo, 0));
+  protected readonly percentual = computed(() => (this.renda() > 0 ? Math.round((this.totalMes() / this.renda()) * 100) : 0));
+  protected readonly percentualBarra = computed(() => Math.min(this.percentual(), 100));
+
   /** Comparação com o mês anterior (só aparece se os dois meses têm gasto). Subir = gastou mais. */
   protected readonly variacao = computed(() => {
     const antes = this.totalAnterior();
@@ -190,33 +242,38 @@ export class Painel {
     const anterior = navegarMes(this.mes().ano, this.mes().mes, -1);
     return { pct: Math.round(((this.totalMes() - antes) / antes) * 100), mes: NOMES_MES[anterior.mes - 1].slice(0, 3).toLowerCase() };
   });
-  protected readonly sobra = computed(() => this.renda() - this.totalMes());
-  protected readonly percentual = computed(() => (this.renda() > 0 ? Math.round((this.totalMes() / this.renda()) * 100) : 0));
-  protected readonly percentualBarra = computed(() => Math.min(this.percentual(), 100));
 
-  /** Cartões de crédito com a soma das parcelas que caem na fatura do mês escolhido. */
+  /** Cartões de crédito com a fatura do mês escolhido e se ela já está toda paga. */
   protected readonly cartoes = computed(() =>
     this.contas()
       .filter((c) => c.tipo === 'credito')
-      .map((c) => ({
-        id: c.id,
-        nome: c.nome,
-        vencimento: c.dia_vencimento,
-        fundo: gradienteDoCartao(c.id),
-        fatura: soma(this.doMes().filter((l) => l.compra.conta_cartao?.id === c.id)),
-      })),
+      .map((c) => {
+        const itens = this.doMes().filter((l) => l.compra.conta_cartao?.id === c.id);
+        return {
+          id: c.id, nome: c.nome, vencimento: c.dia_vencimento, fundo: gradienteDoCartao(c.id),
+          fatura: soma(itens), paga: itens.length > 0 && itens.every((l) => l.pago),
+        };
+      }),
   );
 
   protected readonly porCategoria = computed(() => {
-    const grupos = new Map<string, { nome: string; cor: string; total: number }>();
+    const limites = new Map(this.categorias().map((c) => [c.nome, c.limite ?? null]));
+    const grupos = new Map<string, { nome: string; cor: string; total: number; limite: number | null }>();
     for (const l of this.doMes()) {
       const nome = l.compra.categoria?.nome ?? 'Sem categoria';
-      const g = grupos.get(nome) ?? { nome, cor: l.compra.categoria?.cor ?? '#71717a', total: 0 };
+      const g = grupos.get(nome) ?? { nome, cor: l.compra.categoria?.cor ?? '#71717a', total: 0, limite: limites.get(nome) ?? null };
       g.total += l.valor;
       grupos.set(nome, g);
     }
     return [...grupos.values()].sort((a, b) => b.total - a.total);
   });
+
+  /** Categorias com limite que já passaram de 80% no mês. */
+  protected readonly alertas = computed(() =>
+    this.porCategoria()
+      .filter((c) => c.limite && c.total >= c.limite * ALERTA_LIMITE)
+      .map((c) => ({ ...c, limite: c.limite!, pct: Math.round((c.total / c.limite!) * 100) })),
+  );
 
   /** Rosca: cada fatia é um círculo tracejado (circunferência = 100). Um respiro de 1.5 separa as fatias. */
   protected readonly fatias = computed(() => {
@@ -245,10 +302,12 @@ export class Painel {
     effect(() => {
       this.dados.versao();
       untracked(() => {
-        Promise.all([this.dados.configuracao(), this.dados.contas()])
-          .then(([c, contas]) => {
+        Promise.all([this.dados.configuracao(), this.dados.contas(), this.dados.categorias(), this.dados.cofres()])
+          .then(([c, contas, categorias, cofres]) => {
             this.config.set(c);
             this.contas.set(contas);
+            this.categorias.set(categorias);
+            this.cofres.set(cofres);
           })
           .catch((e) => this.erro.set(mensagemDeErro(e)));
         this.carregarProximos();
@@ -272,12 +331,6 @@ export class Painel {
     return this.totalMes() ? Math.round((v / this.totalMes()) * 100) : 0;
   }
 
-  protected quando(data: string) {
-    if (data === hoje()) return 'Hoje';
-    const { dia, mes } = lerData(data);
-    return `${dia} de ${NOMES_MES[mes - 1].slice(0, 3).toLowerCase()}`;
-  }
-
   protected curto(v: number) {
     return v >= 1000 ? `${(v / 1000).toLocaleString('pt-BR', { maximumFractionDigits: 1 })}k` : Math.round(v).toString();
   }
@@ -287,7 +340,7 @@ export class Painel {
     const fim = new Date(h.ano, h.mes - 1, h.dia + DIAS_PROXIMOS);
     try {
       const lista = await this.dados.lancamentosPorData(hoje(), formatar(fim.getFullYear(), fim.getMonth() + 1, fim.getDate()));
-      this.proximos.set(lista.slice(0, 6));
+      this.proximos.set(lista.filter((l) => !l.pago).slice(0, 6));
     } catch {
       /* o erro principal já aparece pelo carregar() */
     }
@@ -309,9 +362,9 @@ export class Painel {
       ]);
       // Trocou de mês rápido: a resposta antiga chega depois e não pode sobrescrever a nova.
       if (pedido !== this.pedido) return;
-      this.totalAnterior.set(soma(anterior));
-      this.doMes.set(doMes);
-      this.aVencer.set(aVencer);
+      this.totalAnterior.set(soma(anterior.filter(ehGasto)));
+      this.itensMes.set(doMes);
+      this.aVencer.set(aVencer.filter(ehGasto));
     } catch (e) {
       this.erro.set(mensagemDeErro(e));
     }

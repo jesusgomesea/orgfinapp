@@ -2,11 +2,13 @@
 // Excluir categoria ou cartão NÃO apaga gastos: eles ficam "sem categoria"/"sem pagamento".
 // Backup: baixa um .json com tudo; restaurar troca TODOS os dados pelos do arquivo (o servidor valida antes).
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
+import { SwPush } from '@angular/service-worker';
+import { firstValueFrom } from 'rxjs';
 import { FormsModule } from '@angular/forms';
-import { mensagemDeErro } from '../nucleo/api';
+import { chamar, mensagemDeErro } from '../nucleo/api';
 import { Categoria, Configuracao, ContaCartao, Dados, TIPOS_CONTA } from '../nucleo/dados';
 import { IconeCategoria } from '../nucleo/categoria-icone';
-import { gradienteDoCartao, hoje } from '../nucleo/formato';
+import { gradienteDoCartao, hoje, reais } from '../nucleo/formato';
 import { Icone } from '../nucleo/icone';
 
 type ContaEdicao = Omit<ContaCartao, 'id'> & { id?: number };
@@ -87,7 +89,7 @@ type ContaEdicao = Omit<ContaCartao, 'id'> & { id?: number };
       <h2><app-icone nome="etiqueta" /> Categorias</h2>
       @for (c of categorias(); track c.id) {
         <div class="item">
-          <span class="com-icone"><app-icone-categoria [nome]="c.nome" [cor]="c.cor" />{{ c.nome }}</span>
+          <span class="com-icone"><app-icone-categoria [nome]="c.nome" [cor]="c.cor" /><span>{{ c.nome }}@if (c.limite) { <small class="suave bloco">limite {{ reais(c.limite) }}/mês</small> }</span></span>
           <span class="item-acoes">
             <button class="icone-botao" type="button" (click)="categoria = { ...c }" aria-label="Editar"><app-icone nome="lapis" /></button>
             <button class="icone-botao perigo" type="button" (click)="excluirCategoria(c)" aria-label="Excluir"><app-icone nome="lixeira" /></button>
@@ -100,11 +102,33 @@ type ContaEdicao = Omit<ContaCartao, 'id'> & { id?: number };
           <label>Nome <input [(ngModel)]="categoria.nome" /></label>
           <label class="cor">Cor <input type="color" [(ngModel)]="categoria.cor" /></label>
         </div>
+        <label>Limite por mês (R$, opcional) <input type="number" inputmode="decimal" step="0.01" min="0" [(ngModel)]="categoria.limite" placeholder="Ex.: 1200" /></label>
+        <p class="suave dica">Com limite, o painel avisa quando a categoria passar de 80% no mês.</p>
         <div class="linha acoes">
           @if (categoria.id) { <button type="button" class="link" (click)="categoria = categoriaVazia()">cancelar</button> }
           <button type="button" (click)="salvarCategoria()" [disabled]="!categoria.nome.trim()">Salvar</button>
         </div>
       </div>
+    </section>
+
+    <section class="cartao" id="avisos">
+      <h2><app-icone nome="sino" /> Avisos de vencimento</h2>
+      <p class="suave">Na véspera, às 8h, o celular avisa o que vence no dia seguinte e ainda não foi pago.</p>
+      @switch (avisos()) {
+        @case ('indisponivel') {
+          <p class="aviso">Neste aparelho não dá para receber avisos. No iPhone, primeiro <strong>adicione o app à Tela de Início</strong> (Safari → Compartilhar) e abra por lá.</p>
+        }
+        @case ('ligado') {
+          <p class="aviso ok">Avisos ligados neste aparelho.</p>
+          <div class="linha">
+            <button type="button" (click)="testarAvisos()"><app-icone nome="sino" /> Enviar teste</button>
+            <button type="button" class="link perigo" (click)="desligarAvisos()">desligar</button>
+          </div>
+        }
+        @default {
+          <button type="button" class="primario" (click)="ligarAvisos()" [disabled]="avisos() === 'carregando'"><app-icone nome="sino" /> Ligar avisos neste aparelho</button>
+        }
+      }
     </section>
 
     <section class="cartao" id="backup">
@@ -130,11 +154,13 @@ export class Cadastros implements OnInit {
   protected readonly ok = signal('');
   protected readonly creditos = computed(() => this.contas().filter((c) => c.tipo === 'credito'));
   protected readonly gradiente = gradienteDoCartao;
+  protected readonly reais = reais;
   protected config: Configuracao = { renda_mensal: 0, dia_salario: null, saldo_inicial: 0 };
   protected conta: ContaEdicao = this.contaVazia();
   protected categoria: Partial<Categoria> & { nome: string; cor: string } = this.categoriaVazia();
 
   async ngOnInit() {
+    this.verificarAvisos().catch(() => this.avisos.set('indisponivel'));
     await this.tentar(async () => {
       this.config = { ...((await this.dados.configuracao()) ?? this.config) };
       await this.recarregar();
@@ -173,7 +199,7 @@ export class Cadastros implements OnInit {
 
   protected salvarCategoria() {
     return this.tentar(async () => {
-      await this.dados.salvarCategoria({ ...this.categoria, nome: this.categoria.nome.trim() });
+      await this.dados.salvarCategoria({ ...this.categoria, nome: this.categoria.nome.trim(), limite: Number(this.categoria.limite) || null });
       this.categoria = this.categoriaVazia();
       await this.recarregar();
     }, 'Categoria salva.');
@@ -221,13 +247,54 @@ export class Cadastros implements OnInit {
   }
 
   protected categoriaVazia() {
-    return { nome: '', cor: '#64748b' };
+    return { nome: '', cor: '#64748b', limite: null as number | null };
   }
 
   private async recarregar() {
     const [cats, contas] = await Promise.all([this.dados.categorias(), this.dados.contas()]);
     this.categorias.set(cats);
     this.contas.set(contas);
+  }
+
+  // ---------- avisos (Web Push) ----------
+  private readonly push = inject(SwPush);
+  protected readonly avisos = signal<'indisponivel' | 'desligado' | 'ligado' | 'carregando'>('carregando');
+
+  private async verificarAvisos() {
+    if (!this.push.isEnabled || !('Notification' in window)) return this.avisos.set('indisponivel');
+    const atual = await firstValueFrom(this.push.subscription);
+    this.avisos.set(atual && Notification.permission === 'granted' ? 'ligado' : 'desligado');
+  }
+
+  protected ligarAvisos() {
+    return this.tentar(async () => {
+      this.avisos.set('carregando');
+      try {
+        const { chavePublica } = await chamar<{ chavePublica: string }>('avisos');
+        const inscricao = await this.push.requestSubscription({ serverPublicKey: chavePublica });
+        await chamar('avisos', { corpo: { acao: 'inscrever', inscricao: inscricao.toJSON() } });
+        this.avisos.set('ligado');
+      } catch (e) {
+        this.avisos.set('desligado');
+        if (Notification.permission === 'denied') throw new Error('As notificações estão bloqueadas para este app nas configurações do aparelho.');
+        throw e;
+      }
+    }, 'Avisos ligados.');
+  }
+
+  protected desligarAvisos() {
+    return this.tentar(async () => {
+      const atual = await firstValueFrom(this.push.subscription);
+      if (atual) await chamar('avisos', { corpo: { acao: 'cancelar', endpoint: atual.endpoint } });
+      await this.push.unsubscribe().catch(() => {});
+      this.avisos.set('desligado');
+    }, 'Avisos desligados neste aparelho.');
+  }
+
+  protected testarAvisos() {
+    return this.tentar(async () => {
+      await chamar('avisos', { corpo: { acao: 'testar' } });
+    }, 'Teste enviado: deve chegar em alguns segundos.');
   }
 
   private async tentar(acao: () => Promise<void>, sucesso = '') {

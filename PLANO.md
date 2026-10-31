@@ -29,10 +29,13 @@ Atualiza sozinho a cada deploy (sem QR, sem reinstalar).
 - [x] Telas: entrar, primeiro acesso, painel, calendário, novo gasto (conversa), ajustes com backup
 - [x] Funções Netlify: entrar, dados (Blobs), interpretar-gasto (Gemini com troca de modelo)
 - [x] 18 testes (parcelas, ações dos dados, token); app testado no navegador com servidor simulado
-- [ ] Publicar com `APP_SENHA`, `APP_SEGREDO`, `GEMINI_API_KEY` e testar de ponta a ponta com Blobs e Gemini reais
+- [x] Publicado no Netlify com `APP_SENHA`, `APP_SEGREDO`, `GEMINI_API_KEY`
+- [x] Responsivo (celular, tablet, deitado, desktop) e acessibilidade
+- [x] Foto do comprovante, fixos e entradas (com cadastro em massa), pago, fatura do cartão, desfazer, limite por categoria
+- [x] Cofres com meta, relatórios do ano com exportação para Excel, assistente de perguntas, avisos de vencimento
+- [ ] Testar no site publicado: foto real, assistente e avisos com Gemini e push de verdade
 
 ## Ideias para depois
 
-- Receitas além do salário (freelas, reembolsos)
-- Metas por categoria com alerta ao passar do limite
-- Exportar o mês em planilha
+- Importar extrato do banco (OFX/CSV)
+- Dividir gasto com outra pessoa
