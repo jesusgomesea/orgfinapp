@@ -1,18 +1,19 @@
 // Ajustes: renda, formas de pagamento, categorias e backup.
 // Excluir categoria ou cartão NÃO apaga gastos: eles ficam "sem categoria"/"sem pagamento".
 // Backup: baixa um .json com tudo; restaurar troca TODOS os dados pelos do arquivo (o servidor valida antes).
-import { Component, inject, OnInit, signal } from '@angular/core';
+import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { mensagemDeErro } from '../nucleo/api';
 import { Categoria, Configuracao, ContaCartao, Dados, TIPOS_CONTA } from '../nucleo/dados';
-import { hoje } from '../nucleo/formato';
+import { IconeCategoria } from '../nucleo/categoria-icone';
+import { gradienteDoCartao, hoje } from '../nucleo/formato';
 import { Icone } from '../nucleo/icone';
 
 type ContaEdicao = Omit<ContaCartao, 'id'> & { id?: number };
 
 @Component({
   selector: 'app-cadastros',
-  imports: [FormsModule, Icone],
+  imports: [FormsModule, Icone, IconeCategoria],
   template: `
     <header class="topo"><h1>Ajustes</h1></header>
     @if (erro()) { <p class="aviso erro">{{ erro() }}</p> }
@@ -28,8 +29,19 @@ type ContaEdicao = Omit<ContaCartao, 'id'> & { id?: number };
       <div class="linha acoes"><button type="button" (click)="salvarConfig()">Salvar renda</button></div>
     </section>
 
-    <section class="cartao">
+    <section class="cartao" id="cartoes">
       <h2><app-icone nome="cartao" /> Formas de pagamento</h2>
+      @if (creditos().length) {
+        <div class="carrossel dentro">
+          @for (c of creditos(); track c.id) {
+            <button type="button" class="cartao-credito mini" [style.background]="gradiente(c.id)" (click)="conta = { ...c }">
+              <div class="cc-topo"><strong>{{ c.nome }}</strong><app-icone nome="lapis" /></div>
+              <span class="cc-chip"></span>
+              <small>{{ c.dia_fechamento ? 'Fecha dia ' + c.dia_fechamento : 'Sem fechamento' }} · {{ c.dia_vencimento ? 'vence dia ' + c.dia_vencimento : 'sem vencimento' }}</small>
+            </button>
+          }
+        </div>
+      }
       @for (c of contas(); track c.id) {
         <div class="item">
           <div>
@@ -74,7 +86,7 @@ type ContaEdicao = Omit<ContaCartao, 'id'> & { id?: number };
       <h2><app-icone nome="etiqueta" /> Categorias</h2>
       @for (c of categorias(); track c.id) {
         <div class="item">
-          <span><span class="bolinha" [style.background]="c.cor"></span>{{ c.nome }}</span>
+          <span class="com-icone"><app-icone-categoria [nome]="c.nome" [cor]="c.cor" />{{ c.nome }}</span>
           <span class="item-acoes">
             <button class="icone-botao" type="button" (click)="categoria = { ...c }" aria-label="Editar"><app-icone nome="lapis" /></button>
             <button class="icone-botao perigo" type="button" (click)="excluirCategoria(c)" aria-label="Excluir"><app-icone nome="lixeira" /></button>
@@ -94,7 +106,7 @@ type ContaEdicao = Omit<ContaCartao, 'id'> & { id?: number };
       </div>
     </section>
 
-    <section class="cartao">
+    <section class="cartao" id="backup">
       <h2><app-icone nome="baixar" /> Backup</h2>
       <p class="suave">Guarde uma cópia de tudo de vez em quando (no Drive, no e-mail…).</p>
       <div class="linha">
@@ -115,6 +127,8 @@ export class Cadastros implements OnInit {
   protected readonly contas = signal<ContaCartao[]>([]);
   protected readonly erro = signal('');
   protected readonly ok = signal('');
+  protected readonly creditos = computed(() => this.contas().filter((c) => c.tipo === 'credito'));
+  protected readonly gradiente = gradienteDoCartao;
   protected config: Configuracao = { renda_mensal: 0, dia_salario: null, saldo_inicial: 0 };
   protected conta: ContaEdicao = this.contaVazia();
   protected categoria: Partial<Categoria> & { nome: string; cor: string } = this.categoriaVazia();

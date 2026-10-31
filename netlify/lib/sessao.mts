@@ -10,7 +10,18 @@ const DIAS_VALIDADE = 180;
 export const env = (nome: string) => process.env[nome] ?? '';
 
 export function configurado(): boolean {
-  return !!env('APP_SENHA') && env('APP_SEGREDO').length >= 16;
+  return !problemaDeConfiguracao();
+}
+
+/** Diz QUAL variável está faltando (sem mostrar o valor), para quem configura o Netlify saber o que corrigir. */
+export function problemaDeConfiguracao(): string | null {
+  const problemas: string[] = [];
+  if (!env('APP_SENHA')) problemas.push('APP_SENHA não encontrada');
+  const segredo = env('APP_SEGREDO');
+  if (!segredo) problemas.push('APP_SEGREDO não encontrada');
+  else if (segredo.length < 16) problemas.push(`APP_SEGREDO curta demais (${segredo.length} caracteres; precisa de 16 ou mais)`);
+  if (!problemas.length) return null;
+  return `${problemas.join(' e ')} no Netlify. Confira o nome, o escopo "Functions" e faça um novo deploy.`;
 }
 
 export function senhaConfere(senha: string): boolean {

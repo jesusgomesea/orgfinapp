@@ -16,7 +16,8 @@ sem banco externo nem outra conta para configurar.
   preenche o formulário → você confere → salva. O formulário manual funciona sempre.
 - **Parcelas:** valor total ÷ parcelas, sobra de centavos na 1ª. Cada parcela aparece no calendário do mês em que cai,
   com "Geladeira 3/10 — R$ 300,00 → Casas Bahia · Eletrodomésticos".
-- **Painel do mês:** gasto × renda, gastos por categoria, próximos 30 dias e quanto dos próximos 12 meses já está comprometido.
+- **Painel do mês:** gasto × renda (com o "olhinho" para esconder valores), atalhos, cartões de crédito desenhados com a
+  fatura do mês, gastos por categoria com ícones, próximos 30 dias e quanto dos próximos 12 meses já está comprometido.
 - **Ajustes:** renda, formas de pagamento, categorias e **backup** (baixar / restaurar um arquivo .json).
 
 ### Em que mês cai a 1ª parcela

@@ -77,7 +77,7 @@ export interface LancamentoDetalhado {
     estabelecimento: string | null;
     valor_total: number;
     categoria: { nome: string; cor: string } | null;
-    conta_cartao: { nome: string } | null;
+    conta_cartao: { id: number; nome: string } | null;
   };
 }
 
@@ -229,7 +229,7 @@ export class Dados {
           compra: {
             id: c.id, descricao: c.descricao, estabelecimento: c.estabelecimento || null, valor_total: c.valor_total,
             categoria: cat ? { nome: cat.nome, cor: cat.cor } : null,
-            conta_cartao: conta ? { nome: conta.nome } : null,
+            conta_cartao: conta ? { id: conta.id, nome: conta.nome } : null,
           },
         }];
       })

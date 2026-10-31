@@ -5,13 +5,14 @@
 // dado mais novo em vez de apagar o do outro.
 import { getStore } from '@netlify/blobs';
 import { aplicar, bancoVazio, ErroDeRegra, type Acao, type Banco } from '../lib/operacoes.mts';
-import { autorizado, configurado, json } from '../lib/sessao.mts';
+import { autorizado, json, problemaDeConfiguracao } from '../lib/sessao.mts';
 
 const CHAVE = 'banco';
 const TENTATIVAS = 3;
 
 export default async (req: Request): Promise<Response> => {
-  if (!configurado()) return json(500, { erro: 'Faltam as variáveis APP_SENHA e APP_SEGREDO no Netlify.' });
+  const problema = problemaDeConfiguracao();
+  if (problema) return json(500, { erro: problema });
   if (!autorizado(req)) return json(401, { erro: 'Sessão expirada. Entre de novo.' });
 
   // strong: ler logo depois de gravar precisa ver o que acabou de ser gravado.

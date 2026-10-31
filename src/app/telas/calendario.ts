@@ -4,6 +4,7 @@ import { Component, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { diasNoMes, formatar, lerData } from '../dominio/parcelamento';
 import { mensagemDeErro } from '../nucleo/api';
+import { IconeCategoria } from '../nucleo/categoria-icone';
 import { Dados, LancamentoDetalhado } from '../nucleo/dados';
 import { NOMES_MES, hoje, mesAtual, navegarMes, reais } from '../nucleo/formato';
 import { Icone } from '../nucleo/icone';
@@ -19,7 +20,7 @@ interface Dia {
 
 @Component({
   selector: 'app-calendario',
-  imports: [RouterLink, Icone],
+  imports: [RouterLink, Icone, IconeCategoria],
   template: `
     <header class="topo">
       <h1>Calendário</h1>
@@ -66,7 +67,7 @@ interface Dia {
         <div class="cartao lista">
           @for (l of g.itens; track l.id) {
             <a class="linha-lancamento" [routerLink]="['/gasto', l.compra.id]">
-              <span class="marcador" [style.background]="l.compra.categoria?.cor ?? '#94a3b8'"></span>
+              <app-icone-categoria [nome]="l.compra.categoria?.nome" [cor]="l.compra.categoria?.cor" />
               <span class="texto">
                 <strong>{{ l.compra.descricao }} @if (l.total_parcelas > 1) { <span class="parcela">{{ l.numero }}/{{ l.total_parcelas }}</span> }</strong>
                 <small class="suave">

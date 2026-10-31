@@ -227,50 +227,122 @@ label.ficha:not(.marcada) { opacity: .5; }
 }
 
 // ---------- painel ----------
-.destaque-mes {
-  border-radius: var(--raio); padding: 22px 20px 18px; margin-bottom: 12px;
-  background: var(--cartao);
+.topo-acoes { display: flex; gap: 8px; }
+
+// Cartão principal: fundo escuro com "aurora" verde-limão e roxa em gradiente, valores em vidro fosco.
+.heroi {
+  position: relative; overflow: hidden; isolation: isolate;
+  border-radius: 28px; padding: 18px 20px 20px; margin-bottom: 18px;
   display: flex; flex-direction: column; gap: 10px;
-  small { color: var(--suave); }
-  .alerta { color: var(--negativo); }
+  background:
+    radial-gradient(120% 90% at 100% 0%, rgb(207 255 4 / 55%) 0%, rgb(120 200 0 / 25%) 30%, transparent 60%),
+    radial-gradient(90% 80% at 0% 100%, rgb(139 92 246 / 45%) 0%, transparent 60%),
+    linear-gradient(160deg, #1c1c20 0%, #0d0d10 100%);
+  box-shadow: 0 20px 50px -20px rgb(207 255 4 / 25%), inset 0 1px 0 rgb(255 255 255 / 8%);
+  small { color: rgb(255 255 255 / 70%); }
+  .alerta { color: #ffb4b4; }
+  // granulado sutil por cima do gradiente (textura "premium" sem imagem)
+  &::after {
+    content: ''; position: absolute; inset: 0; z-index: -1; opacity: .25; mix-blend-mode: overlay; pointer-events: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence baseFrequency='.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.5'/%3E%3C/svg%3E");
+  }
 }
-.valor-grande { font-size: 2.9rem; font-weight: 400; letter-spacing: -.05em; line-height: 1; }
+.heroi-topo { display: flex; justify-content: flex-end; margin-bottom: 4px; }
+.vidro {
+  background: rgb(255 255 255 / 9%) !important;
+  backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgb(255 255 255 / 10%);
+}
+.heroi .seletor-mes button { color: rgb(255 255 255 / 75%); }
+.valor-grande { font-size: 3rem; font-weight: 500; letter-spacing: -.05em; line-height: 1; margin: 2px 0 6px; }
 .numeros {
-  display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 6px;
-  > div { background: var(--cartao-2); border-radius: var(--raio-p); padding: 12px 14px; display: flex; flex-direction: column; gap: 2px; }
-  > div:first-child { background: var(--destaque); color: var(--sobre-destaque); small { color: rgb(10 10 10 / 65%); } }
-  > div:first-child .alerta { color: #7a0d0d; }
-  strong { font-size: 1.1rem; font-weight: 600; letter-spacing: -.02em; }
+  display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px;
+  > div { border-radius: var(--raio-p); padding: 12px 14px; display: flex; flex-direction: column; gap: 2px; }
+  strong { font-size: 1.12rem; font-weight: 600; letter-spacing: -.02em; }
 }
 .barra {
-  height: 6px; border-radius: 999px; background: var(--cartao-2); overflow: hidden;
-  span { display: block; height: 100%; background: var(--destaque); border-radius: inherit; transition: width .5s; }
-  &.estourou span { background: var(--negativo); }
+  height: 8px; border-radius: 999px; background: var(--cartao-2); overflow: hidden;
+  span { display: block; height: 100%; border-radius: inherit; transition: width .8s cubic-bezier(.2, .8, .2, 1);
+    background: linear-gradient(90deg, #8ccf00, var(--destaque)); box-shadow: 0 0 12px rgb(207 255 4 / 60%); }
+  &.estourou span { background: linear-gradient(90deg, #f97316, var(--negativo)); box-shadow: 0 0 12px rgb(255 107 107 / 60%); }
+  &.fina { height: 3px; margin-top: 5px; background: var(--cartao-2); border: 0; span { box-shadow: none; } }
 }
 
-.rosca-area { display: grid; grid-template-columns: 120px 1fr; gap: 18px; align-items: center; }
-.rosca { width: 120px; height: 120px; circle { transition: stroke-dasharray .4s; } }
+// Atalhos redondos (como os de app de banco)
+.atalhos {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 22px;
+  a { display: flex; flex-direction: column; align-items: center; gap: 8px; color: var(--suave); text-decoration: none; font-size: .76rem; font-weight: 500; }
+  span {
+    width: 58px; height: 58px; border-radius: 20px; display: grid; place-items: center; color: var(--texto);
+    background: linear-gradient(160deg, #26262b, #18181b); border: 1px solid rgb(255 255 255 / 6%);
+    transition: transform .15s;
+  }
+  a:first-child span { background: linear-gradient(145deg, #e4ff6a, var(--destaque) 50%, #9ad600); color: var(--sobre-destaque); border: 0; box-shadow: 0 10px 24px -10px rgb(207 255 4 / 70%); }
+  a:active span { transform: scale(.94); }
+}
+
+.secao { margin: 0 4px 10px; }
+
+// Cartões de crédito desenhados, em carrossel horizontal com "imã" (scroll-snap)
+.carrossel {
+  display: flex; gap: 12px; overflow-x: auto; scroll-snap-type: x mandatory; scroll-padding-inline: 16px;
+  margin: 0 -16px 18px; padding: 2px 16px 8px; scrollbar-width: none;
+  &::-webkit-scrollbar { display: none; }
+}
+.cartao-credito {
+  flex: 0 0 78%; max-width: 320px; aspect-ratio: 1.6; scroll-snap-align: start;
+  border-radius: 22px; padding: 18px; color: #fff; position: relative; overflow: hidden;
+  display: flex; flex-direction: column; justify-content: space-between;
+  box-shadow: 0 18px 40px -18px rgb(0 0 0 / 80%), inset 0 1px 0 rgb(255 255 255 / 20%);
+  &::before { // brilho diagonal
+    content: ''; position: absolute; inset: -40% -10% auto auto; width: 70%; height: 120%;
+    background: radial-gradient(closest-side, rgb(255 255 255 / 25%), transparent); transform: rotate(25deg);
+  }
+  small { color: rgb(255 255 255 / 75%); font-size: .75rem; }
+}
+.cc-topo { display: flex; justify-content: space-between; align-items: center; strong { font-size: 1.05rem; font-weight: 600; } }
+.cc-chip { width: 34px; height: 26px; border-radius: 6px; background: linear-gradient(135deg, #f5e7a1, #c9a94a); opacity: .9; }
+.cc-valor { display: block; font-size: 1.5rem; font-weight: 600; letter-spacing: -.03em; }
+
+// Rosca com o total no meio
+.rosca-area { display: grid; grid-template-columns: 140px 1fr; gap: 18px; align-items: center; }
+.rosca-caixa { position: relative; width: 140px; height: 140px; }
+.rosca { width: 100%; height: 100%; transform: rotate(0); circle { transition: stroke-dasharray .6s; } }
 .rosca-fundo { stroke: var(--cartao-2); }
+.rosca-centro {
+  position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;
+  small { font-size: .68rem; color: var(--apagado); }
+  strong { font-size: .95rem; letter-spacing: -.02em; }
+}
 .legenda {
-  list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; font-size: .88rem; min-width: 0;
-  li { display: flex; align-items: center; gap: 8px; }
-  .bolinha { margin: 0; }
-  .nome { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .suave { font-size: .8rem; }
+  list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; font-size: .9rem; min-width: 0;
+  li { display: flex; align-items: center; gap: 12px; }
+  .nome { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: flex; flex-direction: column; }
+  .direita { display: flex; flex-direction: column; align-items: flex-end; small { color: var(--apagado); font-size: .72rem; } }
   strong { font-weight: 500; }
 }
 // Celular: rosca em cima e legenda inteira embaixo (lado a lado cortava o nome da categoria).
 @media (max-width: 460px) {
   .rosca-area { grid-template-columns: 1fr; justify-items: center; }
-  .rosca { width: 150px; height: 150px; }
+  .rosca-caixa { width: 170px; height: 170px; }
   .legenda { width: 100%; }
+}
+
+// Ícone redondo de categoria: fundo com a cor da categoria bem clarinha, desenho na cor cheia
+.icone-cat {
+  width: 40px; height: 40px; border-radius: 14px; flex: none; display: grid; place-items: center;
+  background: color-mix(in srgb, var(--cor) 18%, transparent);
+  color: color-mix(in srgb, var(--cor) 70%, white);
+  font-weight: 600; font-size: .95rem;
+  .icone { width: 19px; height: 19px; }
 }
 
 .colunas { display: grid; grid-template-columns: repeat(12, 1fr); gap: 5px; align-items: end; height: 140px; }
 .coluna {
   height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 4px;
-  .pilar { width: 100%; max-width: 20px; min-height: 3px; background: var(--cartao-2); border-radius: 999px; }
-  &:first-child .pilar { background: var(--destaque); }
+  .pilar { width: 100%; max-width: 20px; min-height: 3px; border-radius: 999px; background: linear-gradient(180deg, #3f3f46, #27272a);
+    transform-origin: bottom; animation: crescer .7s cubic-bezier(.2, .8, .2, 1) both; }
+  &:first-child .pilar { background: linear-gradient(180deg, var(--destaque), #6fa800); box-shadow: 0 0 14px rgb(207 255 4 / 45%); }
   .valor { font-size: .58rem; color: var(--suave); }
   small { font-size: .62rem; color: var(--apagado); text-transform: capitalize; }
 }
@@ -339,7 +411,8 @@ label.ficha:not(.marcada) { opacity: .5; }
     background: none; padding: 0; min-height: 0;
     .icone { width: 22px; height: 22px; }
   }
-  .ativa { color: var(--texto); }
+  .ativa { color: var(--texto); .icone { color: var(--destaque); } }
+  .ativa::after { content: ''; width: 4px; height: 4px; border-radius: 50%; background: var(--destaque); margin-top: -1px; }
   .mais span {
     width: 50px; height: 50px; border-radius: 999px;
     display: grid; place-items: center;
@@ -356,3 +429,68 @@ label.ficha:not(.marcada) { opacity: .5; }
   background: var(--texto); color: var(--fundo);
   button { min-height: 38px; background: var(--destaque); color: var(--sobre-destaque); }
 }
+
+// ---------- profundidade e movimento ----------
+// Brilho verde-limão e roxo bem suave atrás do topo da tela (fica parado enquanto o conteúdo rola).
+body::before {
+  content: ''; position: fixed; inset: 0 0 auto 0; height: 420px; z-index: -1; pointer-events: none;
+  background:
+    radial-gradient(60% 70% at 85% -10%, rgb(207 255 4 / 13%), transparent 70%),
+    radial-gradient(50% 60% at 0% 0%, rgb(139 92 246 / 12%), transparent 70%);
+}
+
+// Entrada em cascata: cada bloco da tela sobe um pouco ao aparecer.
+.app > * > *, .pagina > * {
+  animation: subir .5s cubic-bezier(.2, .8, .2, 1) both;
+}
+@for $i from 1 through 8 {
+  .app > * > :nth-child(#{$i}), .pagina > :nth-child(#{$i}) { animation-delay: #{($i - 1) * 45}ms; }
+}
+@keyframes subir { from { opacity: 0; transform: translateY(12px); } }
+@keyframes crescer { from { transform: scaleY(0); } }
+
+// Troca de tela (View Transitions do router): conteúdo some/aparece deslizando, a barra de abas fica parada.
+.abas { view-transition-name: abas; }
+::view-transition-old(root) { animation: .18s ease-in both sumir; }
+::view-transition-new(root) { animation: .28s cubic-bezier(.2, .8, .2, 1) both surgir; }
+@keyframes sumir { to { opacity: 0; transform: translateY(-6px); } }
+@keyframes surgir { from { opacity: 0; transform: translateY(10px); } }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after, ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) {
+    animation: none !important; transition: none !important;
+  }
+}
+// ---------- ajustes ----------
+.com-icone { display: flex; align-items: center; gap: 12px; }
+.carrossel.dentro { margin: 0 -18px; padding: 2px 18px 8px; }
+.cartao-credito.mini {
+  flex-basis: 64%; max-width: 240px; font: inherit; text-align: left; border: 0; min-height: 0; cursor: pointer;
+  align-items: stretch; .cc-valor { font-size: 1.2rem; }
+}
+
+// ---------- entrada: aurora animada atrás do título ----------
+.entrada { position: relative; isolation: isolate; }
+.entrada::before {
+  content: ''; position: fixed; inset: -20% -40% auto -40%; height: 75vh; z-index: -1; pointer-events: none;
+  background:
+    radial-gradient(40% 45% at 70% 40%, rgb(207 255 4 / 35%), transparent 70%),
+    radial-gradient(35% 40% at 30% 30%, rgb(139 92 246 / 35%), transparent 70%),
+    radial-gradient(30% 35% at 55% 70%, rgb(56 189 248 / 18%), transparent 70%);
+  filter: blur(30px);
+  animation: aurora 14s ease-in-out infinite alternate;
+}
+@keyframes aurora {
+  50% { transform: translate(6%, 4%) rotate(8deg) scale(1.08); }
+  to { transform: translate(-6%, 2%) rotate(-6deg) scale(1); }
+}
+.entrada .cartao { background: rgb(24 24 27 / 70%); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid rgb(255 255 255 / 8%); }
+.entrada-marca h1 {
+  background: linear-gradient(100deg, #fff 30%, var(--destaque) 75%, #8ccf00);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+
+// ---------- novo gasto ----------
+.balao.app { background: linear-gradient(160deg, #222226, #18181b); border: 1px solid rgb(255 255 255 / 5%); }
+.balao.voce { background: linear-gradient(135deg, #e4ff6a, var(--destaque) 60%, #a8e000); }
+.compositor { background: linear-gradient(160deg, #1f1f23, #18181b); border: 1px solid rgb(255 255 255 / 6%); }
