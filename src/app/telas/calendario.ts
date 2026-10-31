@@ -41,7 +41,7 @@ interface Dia {
         @for (v of vazios(); track $index) { <span></span> }
         @for (d of dias(); track d.data) {
           <button type="button" class="dia" [class.hoje]="d.data === hoje" [class.selecionado]="d.data === selecionado()"
-                  [class.com-gasto]="d.total > 0" (click)="selecionar(d.data)"
+                  [class.com-gasto]="d.total > 0" (click)="selecionar(d.data)" [attr.aria-pressed]="d.data === selecionado()"
                   [attr.aria-label]="d.numero + (d.total ? ', ' + reais(d.total) : '')">
             <span class="numero">{{ d.numero }}</span>
             @if (d.total > 0) {
@@ -60,7 +60,7 @@ interface Dia {
     <div class="col-lateral">
     <label class="busca campo-icone">
       <app-icone nome="busca" />
-      <input type="search" [value]="busca()" (input)="busca.set($any($event.target).value)" placeholder="Buscar gasto, loja ou categoria" aria-label="Buscar no mês" />
+      <input type="search" [value]="busca()" (input)="busca.set($any($event.target).value)" placeholder="Buscar no mês" aria-label="Buscar no mês" />
     </label>
 
     @if (selecionado()) {

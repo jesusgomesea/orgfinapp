@@ -17,12 +17,12 @@ import { Icone } from '../nucleo/icone';
       <a class="nav-marca" routerLink="/painel" aria-label="org-fin, ir para o painel">
         <img src="icons/icon-96x96.png" alt="" width="32" height="32" /><span class="marca">org<span>fin</span></span>
       </a>
-      <a routerLink="/painel" routerLinkActive="ativa"><app-icone nome="painel" /><span>Painel</span></a>
-      <a routerLink="/calendario" routerLinkActive="ativa"><app-icone nome="calendario" /><span>Calendário</span></a>
+      <a routerLink="/painel" routerLinkActive="ativa" ariaCurrentWhenActive="page"><app-icone nome="painel" /><span>Painel</span></a>
+      <a routerLink="/calendario" routerLinkActive="ativa" ariaCurrentWhenActive="page"><app-icone nome="calendario" /><span>Calendário</span></a>
       <a routerLink="/gasto/novo" class="mais" aria-label="Novo gasto" title="Novo gasto (N)">
         <span class="mais-icone"><app-icone nome="mais" /></span><span class="mais-texto">Novo gasto</span>
       </a>
-      <a routerLink="/cadastros" routerLinkActive="ativa"><app-icone nome="ajustes" /><span>Ajustes</span></a>
+      <a routerLink="/cadastros" routerLinkActive="ativa" ariaCurrentWhenActive="page"><app-icone nome="ajustes" /><span>Ajustes</span></a>
       <button type="button" class="nav-sair" (click)="sair()"><app-icone nome="sair" /><span>Sair</span></button>
     </nav>
     <main class="app">

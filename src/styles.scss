@@ -10,7 +10,7 @@
   --borda: #27272a;
   --texto: #fafafa;
   --suave: #a1a1aa;
-  --apagado: #71717a;
+  --apagado: #8b8b95; // contraste ≥ 4,5:1 sobre o fundo (texto pequeno legível)
   --destaque: #cfff04;
   --sobre-destaque: #0a0a0a;
   --destaque-fraco: rgb(207 255 4 / 12%);
@@ -36,6 +36,7 @@ html, body {
   font-variant-numeric: tabular-nums;
   -webkit-font-smoothing: antialiased;
   -webkit-tap-highlight-color: transparent;
+  -webkit-text-size-adjust: 100%; text-size-adjust: 100%; // iPhone deitado não aumenta a fonte sozinho
 }
 
 h1 { font-size: 1.75rem; font-weight: 500; letter-spacing: -.04em; margin: 0; }
@@ -254,7 +255,7 @@ label.ficha:not(.marcada) { opacity: .5; }
   border: 1px solid rgb(255 255 255 / 10%);
 }
 .heroi .seletor-mes button { color: rgb(255 255 255 / 75%); }
-.valor-grande { font-size: 3rem; font-weight: 500; letter-spacing: -.05em; line-height: 1; margin: 2px 0 6px; }
+.valor-grande { font-size: clamp(2.1rem, 11.5vw, 3rem); font-weight: 500; overflow-wrap: anywhere; letter-spacing: -.05em; line-height: 1; margin: 2px 0 6px; }
 .numeros {
   display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px;
   > div { border-radius: var(--raio-p); padding: 12px 14px; display: flex; flex-direction: column; gap: 2px; }
@@ -543,7 +544,8 @@ body::before {
 }
 
 @media (min-width: 1100px) {
-  body { padding-left: 248px; }
+  // Só as telas logadas (que têm o menu lateral) abrem espaço à esquerda; login e primeiro acesso ficam centralizados.
+  app-estrutura { display: block; padding-left: 248px; }
   .app { max-width: 1180px; padding: 32px 40px 48px; }
 
   // Menu lateral
@@ -604,3 +606,65 @@ body::before {
 }
 // Data da 1ª parcela (novo gasto): campo + explicação da data automática
 .primeira-parcela { display: flex; flex-direction: column; gap: 6px; small { font-size: .8rem; line-height: 1.4; } .link { min-height: 0; padding: 0 4px; font-size: .8rem; color: var(--destaque); } }
+
+// ---------- ajustes finos por aparelho ----------
+// Foco visível só para quem navega pelo teclado (não aparece no toque).
+:focus-visible { outline: 2px solid var(--destaque); outline-offset: 2px; }
+input:focus-visible, select:focus-visible, textarea:focus-visible { outline: none; }
+
+// Efeitos de passar o mouse só onde existe mouse (no toque eles "grudam").
+@media (hover: hover) {
+  .atalhos a:hover span { transform: translateY(-2px); }
+  .cartao-credito { transition: transform .2s; &:hover { transform: translateY(-3px); } }
+  .linha-lancamento:hover .texto > strong { color: var(--destaque); }
+  .dia:hover { background: var(--cartao-2); }
+}
+
+// Listas: descrição em até 2 linhas inteiras, em vez de uma palavra por linha.
+.linha-lancamento .texto > strong {
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere;
+}
+.variacao { white-space: nowrap; }
+.numeros strong { overflow-wrap: anywhere; }
+.exemplos .ficha { min-height: 36px; }
+
+// Celular: respeita as bordas arredondadas/entalhe também nas laterais (iPhone deitado).
+@media (max-width: 767px) {
+  .app, .pagina { padding-left: max(16px, env(safe-area-inset-left)); padding-right: max(16px, env(safe-area-inset-right)); }
+}
+
+// Telas bem estreitas (≤ 360px, ex.: iPhone SE, Androids compactos)
+@media (max-width: 360px) {
+  .app, .pagina { padding-left: 12px; padding-right: 12px; }
+  .cartao { padding: 16px; }
+  .heroi { padding: 16px; border-radius: 24px; }
+  .heroi-topo { flex-wrap: wrap; gap: 8px; }
+  .numeros { grid-template-columns: 1fr; }
+  .atalhos span { width: 52px; height: 52px; border-radius: 18px; }
+  .grupo-dia .lista { padding: 2px 14px; }
+  .linha-lancamento { gap: 10px; .valor { font-size: .9rem; } }
+  .icone-cat { width: 34px; height: 34px; border-radius: 12px; .icone { width: 17px; height: 17px; } }
+  .abas a, .abas button { font-size: .58rem; }
+  .cartao-credito { flex-basis: 86%; }
+}
+
+// Celular deitado (pouca altura): a barra de baixo comeria metade da tela, então vira um trilho vertical
+// à esquerda, só com ícones.
+@media (orientation: landscape) and (max-height: 520px) and (max-width: 1099px) {
+  app-estrutura { display: block; padding-left: calc(72px + env(safe-area-inset-left)); }
+  .abas {
+    left: 0; right: auto; top: 0; bottom: 0; width: calc(72px + env(safe-area-inset-left)); max-width: none; height: auto; margin: 0;
+    border-radius: 0; border: 0; border-right: 1px solid rgb(255 255 255 / 6%);
+    padding: 8px 0 8px env(safe-area-inset-left);
+    display: flex; flex-direction: column; justify-content: center; gap: 4px;
+    a, button { height: 52px; }
+    // texto escondido só visualmente: leitor de tela continua dizendo "Painel", "Calendário"...
+    a > span:not(.mais-icone), button > span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+    .ativa::after { display: none; }
+    .mais { order: -1; margin-bottom: 8px; }
+  }
+  .app { padding-top: calc(env(safe-area-inset-top) + 12px); padding-bottom: 32px; padding-right: max(16px, env(safe-area-inset-right)); }
+  .toast { bottom: 16px; left: calc(50% + 36px); }
+  .faixa-atualizacao { bottom: 16px; left: 88px; }
+  .valor-grande { font-size: 2.4rem; }
+}
