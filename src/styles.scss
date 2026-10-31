@@ -602,3 +602,5 @@ body::before {
 @media (min-width: 1500px) {
   .app { max-width: 1320px; }
 }
+// Data da 1ª parcela (novo gasto): campo + explicação da data automática
+.primeira-parcela { display: flex; flex-direction: column; gap: 6px; small { font-size: .8rem; line-height: 1.4; } .link { min-height: 0; padding: 0 4px; font-size: .8rem; color: var(--destaque); } }

@@ -37,6 +37,14 @@ describe('ações do banco', () => {
     expect(b.lancamentos).toHaveLength(0);
   });
 
+  it('data da 1ª parcela informada é gravada e usada', () => {
+    let b = comCadastros();
+    b = aplicar(b, { acao: 'salvarCompra', dados: { ...geladeira(b), data_compra: '2026-10-31', primeira_parcela: '2026-11-10' } });
+    expect(b.compras[0].primeira_parcela).toBe('2026-11-10');
+    expect(b.lancamentos[0]).toMatchObject({ competencia: '2026-11-01', data_prevista: '2026-11-10' });
+    expect(() => aplicar(b, { acao: 'salvarCompra', dados: { ...geladeira(b), primeira_parcela: '10/11' } })).toThrow(ErroDeRegra);
+  });
+
   it('excluir categoria deixa o gasto sem categoria', () => {
     let b = comCadastros();
     b = aplicar(b, { acao: 'salvarCompra', dados: geladeira(b) });

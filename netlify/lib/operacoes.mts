@@ -30,6 +30,8 @@ export interface Compra {
   categoria_id: number | null;
   conta_id: number | null;
   origem: 'manual' | 'ia';
+  /** Quando a 1ª parcela vence, se a pessoa informou (carnê, boleto). null = regra do cartão. */
+  primeira_parcela?: string | null;
   criado_em: string;
 }
 export interface Lancamento {
@@ -142,10 +144,13 @@ export function aplicar(atual: Banco, a: Acao, agora = new Date().toISOString())
         categoria_id,
         conta_id,
         origem: d.origem === 'ia' ? ('ia' as const) : ('manual' as const),
+        primeira_parcela: d.primeira_parcela ? data(d.primeira_parcela) : null,
       };
       let parcelas;
       try {
-        parcelas = gerarParcelas(dados.valor_total, dados.parcelas, dados.data_compra, b.contas.find((c) => c.id === conta_id) ?? null);
+        parcelas = gerarParcelas(
+          dados.valor_total, dados.parcelas, dados.data_compra, b.contas.find((c) => c.id === conta_id) ?? null, dados.primeira_parcela,
+        );
       } catch (e) {
         throw new ErroDeRegra((e as Error).message);
       }

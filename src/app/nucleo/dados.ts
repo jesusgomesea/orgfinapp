@@ -36,6 +36,8 @@ export interface CompraForm {
   categoria_id: number | null;
   conta_id: number | null;
   origem: 'manual' | 'ia';
+  /** Data em que a 1ª parcela vence, se a pessoa informou; vazio = regra do cartão. */
+  primeira_parcela?: string | null;
 }
 
 interface Compra extends CompraForm {
@@ -201,9 +203,12 @@ export class Dados {
     await this.enviar({ acao: 'salvarCompra', dados });
   }
 
-  previaParcelas(compra: Pick<CompraForm, 'valor_total' | 'parcelas' | 'data_compra' | 'conta_id'>, contas: ContaCartao[]): Parcela[] {
+  previaParcelas(
+    compra: Pick<CompraForm, 'valor_total' | 'parcelas' | 'data_compra' | 'conta_id' | 'primeira_parcela'>,
+    contas: ContaCartao[],
+  ): Parcela[] {
     const conta = contas.find((c) => c.id === compra.conta_id) ?? null;
-    return gerarParcelas(compra.valor_total, compra.parcelas, compra.data_compra, conta);
+    return gerarParcelas(compra.valor_total, compra.parcelas, compra.data_compra, conta, compra.primeira_parcela || null);
   }
 
   async excluirCompra(id: number): Promise<void> {

@@ -10,6 +10,7 @@ export interface SugestaoGasto {
   valor_total: number | null;
   parcelas: number | null;
   data_compra: string | null;
+  primeira_parcela: string | null;
   categoria: string | null;
   conta: string | null;
   observacao: string | null;

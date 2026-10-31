@@ -44,24 +44,38 @@ export function mesesAteAPrimeira(diaCompra: number, parcelas: number, conta: Co
   return parcelas > 1 ? 1 : 0;
 }
 
+/**
+ * @param primeiraParcela opcional, 'AAAA-MM-DD'. Quando a pessoa sabe quando a 1ª parcela vence (carnê de loja,
+ *   boleto, "começo a pagar dia 10"), essa data manda: a 1ª cai nela e as outras no mesmo dia dos meses seguintes.
+ *   Vazio = calcula pela regra do cartão/forma de pagamento (mesesAteAPrimeira).
+ */
 export function gerarParcelas(
   valorTotal: number,
   parcelas: number,
   dataCompra: string,
   conta: ContaParaParcela | null,
+  primeiraParcela?: string | null,
 ): Parcela[] {
   if (!(valorTotal > 0)) throw new Error('Informe um valor maior que zero.');
   if (!Number.isInteger(parcelas) || parcelas < 1 || parcelas > 120) {
     throw new Error('Parcelas deve ser um número inteiro entre 1 e 120.');
   }
-  const { ano, mes, dia } = lerData(dataCompra);
   const valores = dividirEmCentavos(Math.round(valorTotal * 100), parcelas);
-  const inicio = mesesAteAPrimeira(dia, parcelas, conta);
+
+  let ano: number, mes: number, inicio: number, diaNoMes: number;
+  if (primeiraParcela) {
+    ({ ano, mes, dia: diaNoMes } = lerData(primeiraParcela));
+    inicio = 0;
+  } else {
+    const compra = lerData(dataCompra);
+    ({ ano, mes } = compra);
+    inicio = mesesAteAPrimeira(compra.dia, parcelas, conta);
+    // No cartão aparece no dia do vencimento da fatura; sem vencimento cadastrado, no mesmo dia da compra.
+    diaNoMes = conta?.tipo === 'credito' && conta.dia_vencimento ? conta.dia_vencimento : compra.dia;
+  }
 
   return valores.map((centavos, i) => {
     const { ano: a, mes: m } = somarMeses(ano, mes, inicio + i);
-    // No cartão aparece no dia do vencimento da fatura; sem vencimento cadastrado, no mesmo dia da compra.
-    const diaNoMes = conta?.tipo === 'credito' && conta.dia_vencimento ? conta.dia_vencimento : dia;
     return {
       numero: i + 1,
       total_parcelas: parcelas,

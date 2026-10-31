@@ -49,6 +49,18 @@ describe('gerarParcelas', () => {
     expect(p.map((x) => x.competencia)).toEqual(['2027-01-01', '2027-02-01', '2027-03-01']);
   });
 
+  it('data da 1ª parcela informada manda: carnê de loja que vence dia 10 do mês atual', () => {
+    const p = gerarParcelas(600, 3, '2026-10-31', { tipo: 'boleto', dia_fechamento: null, dia_vencimento: null }, '2026-11-10');
+    expect(p.map((x) => [x.competencia, x.data_prevista])).toEqual([
+      ['2026-11-01', '2026-11-10'], ['2026-12-01', '2026-12-10'], ['2027-01-01', '2027-01-10'],
+    ]);
+  });
+
+  it('data da 1ª parcela também vence a regra do cartão (inclusive no mesmo mês da compra)', () => {
+    const p = gerarParcelas(100, 2, '2026-10-20', nubank, '2026-10-25');
+    expect(p.map((x) => x.data_prevista)).toEqual(['2026-10-25', '2026-11-25']);
+  });
+
   it('recusa valor zero e parcelas inválidas', () => {
     expect(() => gerarParcelas(0, 1, '2026-10-01', null)).toThrow();
     expect(() => gerarParcelas(10, 0, '2026-10-01', null)).toThrow();

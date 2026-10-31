@@ -33,6 +33,10 @@ sem banco externo nem outra conta para configurar.
 | Cartão com fechamento, compra **até** o dia de fechamento | mês seguinte, no dia do vencimento |
 | Cartão com fechamento, compra **depois** do fechamento | dois meses à frente |
 
+**Data da 1ª parcela informada:** se a loja ou o boleto disser quando vence (carnê, crediário, "primeira dia 10"),
+preencha **"1ª parcela vence em"** (ou diga na frase para a IA). Essa data manda sobre a tabela acima: a 1ª cai nela,
+mesmo que seja no mês atual, e as outras no mesmo dia dos meses seguintes.
+
 A regra está em [`src/app/dominio/parcelamento.ts`](src/app/dominio/parcelamento.ts) e é usada pelo app (prévia) e pelo
 servidor (gravação).
 

@@ -22,11 +22,17 @@ const ESQUEMA = {
     valor_total: { type: ['number', 'null'], description: 'Valor TOTAL em reais. "3 mil" = 3000. Se disser "10x de 300", o total é 3000.' },
     parcelas: { type: ['integer', 'null'], description: 'Número de parcelas. À vista = 1.' },
     data_compra: { type: ['string', 'null'], description: 'AAAA-MM-DD. "hoje", "ontem", "sexta" são relativos à data de hoje informada.' },
+    primeira_parcela: {
+      type: ['string', 'null'],
+      description:
+        'AAAA-MM-DD em que a 1ª parcela (ou o pagamento) vence, SÓ se a frase disser: "primeira dia 10", "começa a pagar 10/11", ' +
+        '"vence dia 10", "cai agora dia 10". Dia sem mês = próxima ocorrência desse dia a partir de hoje. Senão null.',
+    },
     categoria: { type: ['string', 'null'], description: 'Exatamente um nome da lista de categorias, ou null.' },
     conta: { type: ['string', 'null'], description: 'Exatamente um nome da lista de formas de pagamento, ou null.' },
     observacao: { type: ['string', 'null'], description: 'Só se algo ficou ambíguo; uma frase curta em português.' },
   },
-  required: ['descricao', 'estabelecimento', 'valor_total', 'parcelas', 'data_compra', 'categoria', 'conta', 'observacao'],
+  required: ['descricao', 'estabelecimento', 'valor_total', 'parcelas', 'data_compra', 'primeira_parcela', 'categoria', 'conta', 'observacao'],
 };
 
 export default async (req: Request): Promise<Response> => {
@@ -99,7 +105,8 @@ function limpar(s: Record<string, unknown>, categorias: string[], contas: string
   const texto = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim().slice(0, 120) : null);
   const valor = typeof s['valor_total'] === 'number' && s['valor_total'] > 0 ? Math.round(s['valor_total'] * 100) / 100 : null;
   const parcelas = Number.isInteger(s['parcelas']) && (s['parcelas'] as number) >= 1 && (s['parcelas'] as number) <= 120 ? s['parcelas'] : null;
-  const data = typeof s['data_compra'] === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s['data_compra']) ? s['data_compra'] : null;
+  const dataValida = (v: unknown) => (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null);
+  const data = dataValida(s['data_compra']);
   const daLista = (v: unknown, lista: string[]) => (typeof v === 'string' && lista.includes(v) ? v : texto(v));
   return {
     descricao: texto(s['descricao']),
@@ -107,6 +114,7 @@ function limpar(s: Record<string, unknown>, categorias: string[], contas: string
     valor_total: valor,
     parcelas,
     data_compra: data,
+    primeira_parcela: dataValida(s['primeira_parcela']),
     categoria: daLista(s['categoria'], categorias),
     conta: daLista(s['conta'], contas),
     observacao: texto(s['observacao']),

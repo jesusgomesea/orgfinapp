@@ -91,6 +91,23 @@ const PARCELAS_RAPIDAS = [1, 2, 3, 6, 10, 12];
         </label>
       </div>
 
+      <div class="primeira-parcela">
+        <label>
+          {{ +form.parcelas > 1 ? '1ª parcela vence em' : 'Vence / conta em' }}
+          <input name="primeira" type="date" [(ngModel)]="form.primeira_parcela" />
+        </label>
+        <small class="suave">
+          @if (form.primeira_parcela) {
+            Data escolhida por você.
+            <button type="button" class="link" (click)="form.primeira_parcela = null">usar a automática</button>
+          } @else if (automatica(); as a) {
+            Automática: {{ dataCurta(a) }} ({{ motivoAutomatica() }}). Mude se a loja ou o boleto disser outra data.
+          } @else {
+            Vazio = calcula pela forma de pagamento.
+          }
+        </small>
+      </div>
+
       <div class="rotulo">Categoria</div>
       <div class="fichas">
         @for (c of categorias(); track c.id) {
@@ -157,7 +174,7 @@ export class Gasto implements OnInit {
   protected frase = '';
   protected form: CompraForm = {
     descricao: '', estabelecimento: '', valor_total: null as unknown as number, parcelas: 1,
-    data_compra: hoje(), categoria_id: null, conta_id: null, origem: 'manual',
+    data_compra: hoje(), categoria_id: null, conta_id: null, origem: 'manual', primeira_parcela: null,
   };
 
   async ngOnInit() {
@@ -176,6 +193,23 @@ export class Gasto implements OnInit {
     } catch (e) {
       this.erro.set(mensagemDeErro(e));
     }
+  }
+
+  /** Onde a 1ª parcela cairia SEM data escolhida (para mostrar como dica ao lado do campo). */
+  protected automatica(): string | null {
+    try {
+      if (!this.form.valor_total || !this.form.data_compra) return null;
+      const base = { ...this.form, valor_total: Number(this.form.valor_total), parcelas: Number(this.form.parcelas), primeira_parcela: null };
+      return this.dados.previaParcelas(base, this.contas())[0]?.data_prevista ?? null;
+    } catch {
+      return null;
+    }
+  }
+
+  protected motivoAutomatica(): string {
+    const conta = this.contas().find((c) => c.id === this.form.conta_id);
+    if (conta?.tipo === 'credito') return conta.dia_fechamento ? `fatura do ${conta.nome}, fecha dia ${conta.dia_fechamento}` : `fatura do ${conta.nome}`;
+    return +this.form.parcelas > 1 ? 'parcelado: mês seguinte' : 'à vista: dia da compra';
   }
 
   /** Recalculada a cada mudança do formulário; vazia enquanto os campos não fecham. */
@@ -273,12 +307,14 @@ export class Gasto implements OnInit {
       data_compra: s.data_compra ?? this.form.data_compra,
       categoria_id: categoria?.id ?? this.form.categoria_id,
       conta_id: conta?.id ?? this.form.conta_id,
+      primeira_parcela: s.primeira_parcela ?? this.form.primeira_parcela ?? null,
       origem: 'ia',
     };
     const f = this.form;
     const partes = [
       f.descricao,
       f.valor_total ? reais(Number(f.valor_total)) + (f.parcelas > 1 ? ` em ${f.parcelas}x` : ' à vista') : null,
+      f.primeira_parcela ? `1ª em ${dataCurta(f.primeira_parcela)}` : null,
       conta?.nome,
       categoria?.nome,
     ].filter(Boolean);
