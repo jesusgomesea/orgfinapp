@@ -16,7 +16,14 @@ const ler = (nome) => process.env[nome] ?? doArquivo[nome] ?? '';
 const url = ler('SUPABASE_URL');
 const chave = ler('SUPABASE_ANON_KEY');
 if (!url || !chave) {
-  console.warn('[gerar-ambiente] SUPABASE_URL/SUPABASE_ANON_KEY vazios: o app abre, mas não conecta. Veja o README.');
+  const faltando = [!url && 'SUPABASE_URL', !chave && 'SUPABASE_ANON_KEY'].filter(Boolean).join(' e ');
+  // No Netlify, publicar sem as variáveis gera um site que não conecta: melhor o deploy falhar com o motivo.
+  // Causa comum: variável criada só com escopo "Functions" (precisa de "Builds") ou deploy feito antes de criá-la.
+  if (process.env.NETLIFY === 'true') {
+    console.error(`[gerar-ambiente] Faltando ${faltando} no build do Netlify. Confira o escopo "Builds" da variável e faça um novo deploy.`);
+    process.exit(1);
+  }
+  console.warn(`[gerar-ambiente] Faltando ${faltando}: o app abre, mas não conecta. Veja o README.`);
 }
 
 writeFileSync(
