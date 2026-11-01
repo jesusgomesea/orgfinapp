@@ -33,6 +33,15 @@ sem banco externo nem outra conta para configurar.
 - **Relatórios:** ano mês a mês (gastos × renda), categorias, evolução dos cofres, maiores gastos e **exportar para Excel**.
 - **Assistente:** pergunte em conversa ("quanto gastei com mercado este ano?", "onde posso economizar?").
 - **Avisos de vencimento:** às 8h da véspera, o celular avisa o que vence amanhã e ainda não foi pago.
+- **Lançamento rápido:** o **+** abre uma gaveta com o valor grande e um teclado numérico (como no Pix: 1-2-3-4 vira
+  R$ 12,34), depois categoria, pagamento e parcelas em toques. "Mais opções" leva à tela completa (IA, foto, datas).
+- **Gestos:** deslizar um gasto para a direita marca como pago; para a esquerda, exclui (com "Desfazer").
+  Deslizar para os lados no painel, no calendário e na fatura troca o mês.
+- **Ritmo do mês:** gráfico do gasto acumulado dia a dia contra o mês passado ("20% mais rápido que o mês passado").
+- **Retrospectiva:** nos primeiros dias do mês, o painel oferece os "stories" do mês anterior (total, categoria campeã,
+  maior gasto, dia mais caro, limites, cofres). Também em Relatórios.
+- **Aparência (por aparelho):** seu nome na saudação, tema escuro/claro/automático e 6 cores de destaque.
+- **Detalhes:** esqueleto brilhando enquanto carrega, vibração leve ao salvar/pagar (Android) e confete ao bater a meta de um cofre.
 - **Funciona em qualquer tela:** celular (barra de abas embaixo), tablet (blocos lado a lado) e desktop (menu lateral,
   telas em duas colunas, tecla **N** abre um novo gasto). Ao voltar para o app, busca o que outro aparelho lançou.
 

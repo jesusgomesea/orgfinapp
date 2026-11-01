@@ -9,7 +9,8 @@ import { chamar, mensagemDeErro } from '../nucleo/api';
 import { Categoria, Configuracao, ContaCartao, Dados, TIPOS_CONTA } from '../nucleo/dados';
 import { IconeCategoria } from '../nucleo/categoria-icone';
 import { gradienteDoCartao, hoje, reais } from '../nucleo/formato';
-import { Icone } from '../nucleo/icone';
+import { Aparencia, CORES_DESTAQUE, Tema } from '../nucleo/aparencia';
+import { Icone, NomeIcone } from '../nucleo/icone';
 
 type ContaEdicao = Omit<ContaCartao, 'id'> & { id?: number };
 
@@ -21,6 +22,24 @@ type ContaEdicao = Omit<ContaCartao, 'id'> & { id?: number };
     <header class="topo"><h1>Ajustes</h1></header>
     @if (erro()) { <p class="aviso erro">{{ erro() }}</p> }
     @if (ok()) { <p class="aviso ok">{{ ok() }}</p> }
+
+    <section class="cartao">
+      <h2><app-icone nome="brilho" /> Você e aparência</h2>
+      <label>Seu nome (aparece na saudação) <input [(ngModel)]="config.nome" placeholder="Como quer ser chamado" maxlength="40" /></label>
+      <div class="linha acoes"><button type="button" (click)="salvarConfig()">Salvar nome</button></div>
+      <div class="rotulo">Tema deste aparelho</div>
+      <div class="escolha-tema">
+        @for (t of temas; track t.valor) {
+          <button type="button" [class.marcada]="aparencia.tema() === t.valor" (click)="aparencia.mudarTema(t.valor)"><app-icone [nome]="t.icone" />{{ t.rotulo }}</button>
+        }
+      </div>
+      <div class="rotulo">Cor de destaque</div>
+      <div class="escolha-cor">
+        @for (c of cores; track c.nome) {
+          <button type="button" [style.background]="c.cor" [class.marcada]="aparencia.destaque().nome === c.nome" (click)="aparencia.mudarDestaque(c)" [attr.aria-label]="'Cor ' + c.nome" [title]="c.nome"></button>
+        }
+      </div>
+    </section>
 
     <section class="cartao">
       <h2><app-icone nome="carteira" /> Renda</h2>
@@ -155,6 +174,13 @@ export class Cadastros implements OnInit {
   protected readonly creditos = computed(() => this.contas().filter((c) => c.tipo === 'credito'));
   protected readonly gradiente = gradienteDoCartao;
   protected readonly reais = reais;
+  protected readonly aparencia = inject(Aparencia);
+  protected readonly cores = CORES_DESTAQUE;
+  protected readonly temas: { valor: Tema; rotulo: string; icone: NomeIcone }[] = [
+    { valor: 'escuro', rotulo: 'Escuro', icone: 'olho-fechado' },
+    { valor: 'claro', rotulo: 'Claro', icone: 'olho' },
+    { valor: 'auto', rotulo: 'Automático', icone: 'repetir' },
+  ];
   protected config: Configuracao = { renda_mensal: 0, dia_salario: null, saldo_inicial: 0 };
   protected conta: ContaEdicao = this.contaVazia();
   protected categoria: Partial<Categoria> & { nome: string; cor: string } = this.categoriaVazia();
@@ -174,11 +200,12 @@ export class Cadastros implements OnInit {
   protected salvarConfig() {
     return this.tentar(async () => {
       await this.dados.salvarConfiguracao({
+        nome: this.config.nome?.trim() || null,
         renda_mensal: Number(this.config.renda_mensal) || 0,
         dia_salario: this.config.dia_salario || null,
         saldo_inicial: Number(this.config.saldo_inicial) || 0,
       });
-    }, 'Renda salva.');
+    }, 'Salvo.');
   }
 
   protected salvarConta() {

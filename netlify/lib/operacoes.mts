@@ -12,6 +12,8 @@
 import { gerarParcelas, type TipoConta } from '../../src/app/dominio/parcelamento.ts';
 
 export interface Configuracao {
+  /** Como o app chama a pessoa na saudação ("Boa noite, Eluan"). */
+  nome?: string | null;
   renda_mensal: number;
   dia_salario: number | null;
   saldo_inicial: number;
@@ -158,6 +160,7 @@ export function aplicar(atual: Banco, a: Acao, agora = new Date().toISOString())
   switch (a.acao) {
     case 'salvarConfiguracao':
       b.configuracao = {
+        nome: typeof a.dados.nome === 'string' && a.dados.nome.trim() ? a.dados.nome.trim().slice(0, 40) : null,
         renda_mensal: numero(a.dados.renda_mensal, 'Renda', 0),
         dia_salario: dia(a.dados.dia_salario),
         saldo_inicial: numero(a.dados.saldo_inicial, 'Saldo'),

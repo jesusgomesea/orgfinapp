@@ -12,6 +12,7 @@ import { Categoria, CompraForm, ContaCartao, Dados } from '../nucleo/dados';
 import { dataCurta, hoje, nomeMesCurto, reais } from '../nucleo/formato';
 import { Avisos } from '../nucleo/avisos';
 import { Foto, Ia, SugestaoGasto, prepararFoto } from '../nucleo/ia';
+import { vibrar } from '../nucleo/efeitos';
 import { Icone } from '../nucleo/icone';
 
 // Reconhecimento de voz do navegador (Chrome/Android e Safari). Onde não existir, o ditado do teclado resolve.
@@ -160,6 +161,12 @@ export class Gasto implements OnInit {
 
   /** Vem da rota /gasto/:id ("novo" = criar). */
   readonly id = input<string>();
+  /** Vindos do lançamento rápido ("Mais opções"), via ?valor=&descricao=&categoria=&conta=&parcelas= */
+  readonly valor = input<string>();
+  readonly descricao = input<string>();
+  readonly categoria = input<string>();
+  readonly conta = input<string>();
+  readonly parcelas = input<string>();
 
   protected readonly reais = reais;
   protected readonly dataCurta = dataCurta;
@@ -196,6 +203,15 @@ export class Gasto implements OnInit {
           this.form = compra;
           this.editando.set(true);
         }
+      } else {
+        this.form = {
+          ...this.form,
+          valor_total: Number(this.valor()) || this.form.valor_total,
+          descricao: this.descricao() ?? this.form.descricao,
+          categoria_id: Number(this.categoria()) || this.form.categoria_id,
+          conta_id: Number(this.conta()) || this.form.conta_id,
+          parcelas: Number(this.parcelas()) || this.form.parcelas,
+        };
       }
     } catch (e) {
       this.erro.set(mensagemDeErro(e));
@@ -290,6 +306,7 @@ export class Gasto implements OnInit {
     try {
       const primeira = this.previa()[0];
       await this.dados.salvarCompra(compra);
+      vibrar([10, 30, 10]);
       this.avisos.mostrar(compra.parcelas > 1 ? `Gasto salvo em ${compra.parcelas} parcelas` : 'Gasto salvo');
       // Abre o calendário no mês em que a 1ª parcela caiu (pode ser mês que vem, ou depois, no cartão).
       await this.router.navigate(['/calendario'], { queryParams: primeira ? { m: primeira.competencia.slice(0, 7) } : {} });

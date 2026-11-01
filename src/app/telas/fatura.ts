@@ -8,12 +8,13 @@ import { ContaCartao, Dados, LancamentoDetalhado, ehGasto } from '../nucleo/dado
 import { NOMES_MES, gradienteDoCartao, mesAtual, navegarMes, primeiroDia } from '../nucleo/formato';
 import { Icone } from '../nucleo/icone';
 import { ItemLancamento } from '../nucleo/item-lancamento';
+import { DeslizarMes } from '../nucleo/deslizar-mes';
 import { Privacidade } from '../nucleo/privacidade';
 
 @Component({
   selector: 'app-fatura',
-  host: { class: 'tela tela-fatura' },
-  imports: [RouterLink, Icone, ItemLancamento],
+  host: { class: 'tela tela-fatura', '[class.carregando]': '!dados.pronto()' },
+  imports: [RouterLink, Icone, ItemLancamento, DeslizarMes],
   template: `
     <header class="topo">
       <a class="icone-botao" routerLink="/painel" aria-label="Voltar"><app-icone nome="esquerda" /></a>
@@ -29,7 +30,7 @@ import { Privacidade } from '../nucleo/privacidade';
 
     <div class="col-principal">
       @if (conta(); as c) {
-        <div class="cartao-credito grande" [style.background]="fundo()">
+        <div class="cartao-credito grande" [style.background]="fundo()" appDeslizarMes (anterior)="mudarMes(-1)" (proximo)="mudarMes(1)">
           <div class="cc-topo"><strong>{{ c.nome }}</strong>@if (paga()) { <span class="selo-pago"><app-icone nome="check" /> paga</span> }</div>
           <span class="cc-chip"></span>
           <div><small>Fatura de {{ nomeMes().toLowerCase() }}</small><strong class="cc-valor">{{ priv.mostrar(total()) }}</strong></div>
@@ -54,7 +55,7 @@ import { Privacidade } from '../nucleo/privacidade';
   `,
 })
 export class Fatura {
-  private readonly dados = inject(Dados);
+  protected readonly dados = inject(Dados);
   private readonly avisos = inject(Avisos);
   protected readonly priv = inject(Privacidade);
 

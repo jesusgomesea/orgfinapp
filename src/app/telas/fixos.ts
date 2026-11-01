@@ -18,7 +18,7 @@ type Aba = 'gastos' | 'entradas';
 
 @Component({
   selector: 'app-fixos',
-  host: { class: 'tela tela-fixos' },
+  host: { class: 'tela tela-fixos', '[class.carregando]': '!dados.pronto()' },
   imports: [FormsModule, Icone, IconeCategoria],
   template: `
     <header class="topo">
@@ -163,7 +163,7 @@ type Aba = 'gastos' | 'entradas';
   `,
 })
 export class Fixos {
-  private readonly dados = inject(Dados);
+  protected readonly dados = inject(Dados);
   private readonly ia = inject(Ia);
   private readonly avisos = inject(Avisos);
   protected readonly priv = inject(Privacidade);

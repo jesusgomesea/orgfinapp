@@ -4,6 +4,7 @@
 import { Component, inject, signal } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 import { SwUpdate } from '@angular/service-worker';
+import { Aparencia } from './nucleo/aparencia';
 
 @Component({
   selector: 'app-root',
@@ -22,6 +23,7 @@ export class App {
   protected readonly novaVersao = signal(false);
 
   constructor() {
+    inject(Aparencia); // aplica tema e cor salvos antes da primeira tela
     const sw = inject(SwUpdate);
     if (!sw.isEnabled) return;
     sw.versionUpdates.subscribe((e) => {

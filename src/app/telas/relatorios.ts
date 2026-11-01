@@ -2,6 +2,7 @@
 // fim de cada mês), maiores gastos e exportação para Excel (CSV com ; e vírgula decimal, que o Excel em português
 // abre direto). Tudo calculado no app a partir dos mesmos itens do calendário.
 import { Component, computed, effect, inject, signal, untracked } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import { mensagemDeErro } from '../nucleo/api';
 import { IconeCategoria } from '../nucleo/categoria-icone';
 import { CofreResumo, Configuracao, Dados, LancamentoDetalhado, ehEntrada, ehGasto } from '../nucleo/dados';
@@ -14,8 +15,8 @@ const ALT = 140;
 
 @Component({
   selector: 'app-relatorios',
-  host: { class: 'tela tela-relatorios' },
-  imports: [Icone, IconeCategoria],
+  host: { class: 'tela tela-relatorios', '[class.carregando]': '!dados.pronto()' },
+  imports: [Icone, IconeCategoria, RouterLink],
   template: `
     <header class="topo">
       <div><small>Visão do ano</small><h1>Relatórios</h1></div>
@@ -94,6 +95,12 @@ const ALT = 140;
         } @empty { <p class="suave">Nada ainda.</p> }
       </section>
 
+      <a class="retro-convite" routerLink="/retrospectiva">
+        <span class="retro-convite-icone"><app-icone nome="brilho" /></span>
+        <span><strong>Retrospectiva do mês passado</strong><small>Em stories, como a do banco</small></span>
+        <app-icone nome="direita" />
+      </a>
+
       <section class="cartao">
         <h2><app-icone nome="baixar" /> Exportar</h2>
         <p class="suave">Arquivo que abre no Excel ou no Google Planilhas.</p>
@@ -106,7 +113,7 @@ const ALT = 140;
   `,
 })
 export class Relatorios {
-  private readonly dados = inject(Dados);
+  protected readonly dados = inject(Dados);
   protected readonly priv = inject(Privacidade);
 
   protected readonly reais = reais;

@@ -24,6 +24,7 @@ export const routes: Routes = [
       { path: 'fatura/:id', loadComponent: () => import('./telas/fatura').then((m) => m.Fatura) },
       { path: 'relatorios', loadComponent: () => import('./telas/relatorios').then((m) => m.Relatorios) },
       { path: 'assistente', loadComponent: () => import('./telas/assistente').then((m) => m.Assistente) },
+      { path: 'retrospectiva', loadComponent: () => import('./telas/retrospectiva').then((m) => m.Retrospectiva) },
       { path: 'mais', loadComponent: () => import('./telas/mais').then((m) => m.Mais) },
       { path: 'cadastros', loadComponent: () => import('./telas/cadastros').then((m) => m.Cadastros) },
     ],

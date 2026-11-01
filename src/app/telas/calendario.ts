@@ -9,6 +9,7 @@ import { Dados, LancamentoDetalhado, ehEntrada, ehGasto } from '../nucleo/dados'
 import { NOMES_MES, hoje, mesAtual, navegarMes, reais } from '../nucleo/formato';
 import { Icone } from '../nucleo/icone';
 import { ItemLancamento } from '../nucleo/item-lancamento';
+import { DeslizarMes } from '../nucleo/deslizar-mes';
 
 const DIAS_SEMANA = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 
@@ -21,8 +22,8 @@ interface Dia {
 
 @Component({
   selector: 'app-calendario',
-  host: { class: 'tela tela-calendario' },
-  imports: [RouterLink, Icone, ItemLancamento],
+  host: { class: 'tela tela-calendario', '[class.carregando]': '!dados.pronto()' },
+  imports: [RouterLink, Icone, ItemLancamento, DeslizarMes],
   template: `
     <header class="topo">
       <h1>Calendário</h1>
@@ -36,7 +37,7 @@ interface Dia {
     @if (erro()) { <p class="aviso erro">{{ erro() }}</p> }
 
     <div class="col-principal">
-    <section class="cartao">
+    <section class="cartao" appDeslizarMes (anterior)="mudarMes(-1)" (proximo)="mudarMes(1)">
       <div class="grade">
         @for (s of semana; track $index) { <span class="dia-semana">{{ s[0] }}</span> }
         @for (v of vazios(); track $index) { <span></span> }
@@ -91,7 +92,7 @@ interface Dia {
   `,
 })
 export class Calendario {
-  private readonly dados = inject(Dados);
+  protected readonly dados = inject(Dados);
 
   /** ?m=AAAA-MM abre direto nesse mês (usado ao salvar um gasto: mostra onde a 1ª parcela caiu). */
   readonly m = input<string>();

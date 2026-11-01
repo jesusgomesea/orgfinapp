@@ -6,11 +6,13 @@
 // O olhinho esconde os valores (Privacidade).
 import { Component, computed, effect, inject, signal, untracked } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { formatar, lerData } from '../dominio/parcelamento';
+import { diasNoMes, formatar, lerData } from '../dominio/parcelamento';
 import { mensagemDeErro } from '../nucleo/api';
 import { IconeCategoria } from '../nucleo/categoria-icone';
 import { Categoria, CofreResumo, Configuracao, ContaCartao, Dados, LancamentoDetalhado, ehEntrada, ehGasto } from '../nucleo/dados';
 import { NOMES_MES, gradienteDoCartao, hoje, mesAtual, navegarMes, nomeMesCurto, primeiroDia } from '../nucleo/formato';
+import { Atalhos, chaveRetrospectivaVista } from '../nucleo/atalhos';
+import { DeslizarMes } from '../nucleo/deslizar-mes';
 import { Icone } from '../nucleo/icone';
 import { ItemLancamento } from '../nucleo/item-lancamento';
 import { Privacidade } from '../nucleo/privacidade';
@@ -21,12 +23,12 @@ const ALERTA_LIMITE = 0.8;
 
 @Component({
   selector: 'app-painel',
-  host: { class: 'tela tela-painel' },
-  imports: [RouterLink, Icone, IconeCategoria, ItemLancamento],
+  host: { class: 'tela tela-painel', '[class.carregando]': '!dados.pronto()' },
+  imports: [RouterLink, Icone, IconeCategoria, ItemLancamento, DeslizarMes],
   template: `
     <header class="topo">
       <div>
-        <small>{{ saudacao }}</small>
+        <small>{{ saudacao }}{{ config()?.nome ? ', ' + config()!.nome : '' }}</small>
         <h1>Seu mês</h1>
       </div>
       <div class="topo-acoes">
@@ -40,7 +42,7 @@ const ALERTA_LIMITE = 0.8;
     @if (erro()) { <p class="aviso erro">{{ erro() }}</p> }
 
     <div class="col-principal">
-    <section class="heroi">
+    <section class="heroi" appDeslizarMes (anterior)="mudarMes(-1)" (proximo)="mudarMes(1)">
       <div class="heroi-topo">
         @if (variacao(); as v) {
           <span class="variacao vidro" [class.subiu]="v.pct > 0" [title]="'Mês anterior: ' + priv.mostrar(totalAnterior())">
@@ -76,8 +78,16 @@ const ALERTA_LIMITE = 0.8;
       </div>
     </section>
 
+    @if (retroPendente(); as r) {
+      <a class="retro-convite" routerLink="/retrospectiva" [queryParams]="{ m: r.chave }">
+        <span class="retro-convite-icone"><app-icone nome="brilho" /></span>
+        <span><strong>Sua retrospectiva de {{ r.nome }} está pronta</strong><small>Toque para ver como foi o mês</small></span>
+        <app-icone nome="direita" />
+      </a>
+    }
+
     <nav class="atalhos" aria-label="Atalhos">
-      <a routerLink="/gasto/novo"><span><app-icone nome="brilho" /></span>Lançar</a>
+      <a href="/gasto/novo" (click)="atalhos.abrirLancamento($event)"><span><app-icone nome="mais" /></span>Lançar</a>
       <a routerLink="/fixos"><span><app-icone nome="repetir" /></span>Fixos</a>
       <a routerLink="/cofres"><span><app-icone nome="cofre" /></span>Cofres</a>
       <a routerLink="/assistente"><span><app-icone nome="conversa" /></span>Perguntar</a>
@@ -126,6 +136,20 @@ const ALERTA_LIMITE = 0.8;
     </div>
 
     <div class="col-lateral">
+    <section class="cartao ritmo">
+      <div class="linha-texto">
+        <h2>Ritmo do mês</h2>
+        <span class="legenda-mini"><i class="lg-atual"></i>{{ nomeMes().slice(0, 3).toLowerCase() }} <i class="lg-anterior"></i>{{ ritmo().nomeAnterior }}</span>
+      </div>
+      @if (ritmo().mensagem; as m) { <p class="ritmo-msg" [class.ruim]="ritmo().pior">{{ m }}</p> }
+      <svg viewBox="0 0 320 120" class="grafico-ritmo" role="img" [attr.aria-label]="ritmo().mensagem || 'Gasto acumulado no mês'">
+        <polyline class="r-anterior" [attr.points]="ritmo().anterior" fill="none" />
+        <polygon class="r-area" [attr.points]="ritmo().area" />
+        <polyline class="r-atual" [attr.points]="ritmo().atual" fill="none" />
+        @if (ritmo().ponto; as p) { <circle class="r-hoje" [attr.cx]="p.x" [attr.cy]="p.y" r="4" /> }
+        <text x="0" y="118">1</text><text x="320" y="118" text-anchor="end">{{ ritmo().dias }}</text>
+      </svg>
+    </section>
     <section class="cartao">
       <h2>Por categoria</h2>
       @if (porCategoria().length) {
@@ -192,8 +216,9 @@ const ALERTA_LIMITE = 0.8;
   `,
 })
 export class Painel {
-  private readonly dados = inject(Dados);
+  protected readonly dados = inject(Dados);
   protected readonly priv = inject(Privacidade);
+  protected readonly atalhos = inject(Atalhos);
 
   protected readonly abs = Math.abs;
   protected readonly min = Math.min;
@@ -213,6 +238,71 @@ export class Painel {
   protected readonly totalAnimado = signal(0);
   protected readonly totalAnterior = signal(0);
   private pedido = 0;
+
+  /** Itens de gasto do mês anterior (para o "Ritmo do mês"). */
+  protected readonly anteriorItens = signal<LancamentoDetalhado[]>([]);
+
+  /**
+   * Ritmo do mês: gasto ACUMULADO dia a dia (pelo dia em que o dinheiro sai) neste mês × no mês anterior.
+   * No mês atual a linha para em hoje e compara "até hoje" com "até o mesmo dia do mês passado".
+   */
+  protected readonly ritmo = computed(() => {
+    const { ano, mes } = this.mes();
+    const dias = diasNoMes(ano, mes);
+    const ant = navegarMes(ano, mes, -1);
+    const diasAnt = diasNoMes(ant.ano, ant.mes);
+    const acumular = (itens: LancamentoDetalhado[], n: number) => {
+      const porDia = Array(n + 1).fill(0);
+      for (const l of itens) porDia[lerData(l.data_prevista).dia] += l.valor;
+      for (let d = 1; d <= n; d++) porDia[d] += porDia[d - 1];
+      return porDia;
+    };
+    const atual = acumular(this.doMes(), dias);
+    const anterior = acumular(this.anteriorItens(), diasAnt);
+    const h = lerData(hoje());
+    const ehAtual = h.ano === ano && h.mes === mes;
+    const ate = ehAtual ? h.dia : dias;
+    const maximo = Math.max(1, atual[dias], anterior[diasAnt]);
+    const x = (d: number, n: number) => ((d - 1) / Math.max(1, n - 1)) * 320;
+    const y = (v: number) => 108 - (v / maximo) * 100;
+    const pontos = (acc: number[], n: number, limite: number) =>
+      Array.from({ length: limite }, (_, i) => `${x(i + 1, n).toFixed(1)},${y(acc[i + 1]).toFixed(1)}`).join(' ');
+    const linhaAtual = pontos(atual, dias, ate);
+    let mensagem = '';
+    let pior = false;
+    const base = anterior[Math.min(ate, diasAnt)];
+    if (base > 0 && atual[ate] > 0) {
+      const pct = Math.round(((atual[ate] - base) / base) * 100);
+      pior = pct > 5;
+      const quando = ehAtual ? 'até hoje' : 'no mês';
+      mensagem = Math.abs(pct) <= 5 ? `Mesmo ritmo do mês passado ${quando}.` : pct > 0 ? `${pct}% mais rápido que o mês passado ${quando}.` : `${-pct}% mais devagar que o mês passado ${quando}. 👏`;
+    }
+    return {
+      dias,
+      nomeAnterior: NOMES_MES[ant.mes - 1].slice(0, 3).toLowerCase(),
+      atual: linhaAtual,
+      area: `0,108 ${linhaAtual} ${x(ate, dias).toFixed(1)},108`,
+      anterior: pontos(anterior, diasAnt, diasAnt),
+      ponto: ehAtual ? { x: x(ate, dias), y: y(atual[ate]) } : null,
+      mensagem,
+      pior,
+    };
+  });
+
+  /** Nos 10 primeiros dias do mês, convida para a retrospectiva do mês passado (se teve gasto e ainda não foi vista). */
+  protected readonly retroPendente = computed(() => {
+    const h = lerData(hoje());
+    const vendoAtual = this.mes().ano === h.ano && this.mes().mes === h.mes;
+    if (!vendoAtual || h.dia > 10 || !this.totalAnterior()) return null;
+    const ant = navegarMes(h.ano, h.mes, -1);
+    const chave = primeiroDia(ant.ano, ant.mes).slice(0, 7);
+    try {
+      if (localStorage.getItem(chaveRetrospectivaVista(chave))) return null;
+    } catch {
+      /* aba anônima: mostra */
+    }
+    return { chave, nome: NOMES_MES[ant.mes - 1].toLowerCase() };
+  });
 
   protected readonly doMes = computed(() => this.itensMes().filter(ehGasto));
   protected readonly nomeMes = computed(() => NOMES_MES[this.mes().mes - 1]);
@@ -363,6 +453,7 @@ export class Painel {
       // Trocou de mês rápido: a resposta antiga chega depois e não pode sobrescrever a nova.
       if (pedido !== this.pedido) return;
       this.totalAnterior.set(soma(anterior.filter(ehGasto)));
+      this.anteriorItens.set(anterior.filter(ehGasto));
       this.itensMes.set(doMes);
       this.aVencer.set(aVencer.filter(ehGasto));
     } catch (e) {

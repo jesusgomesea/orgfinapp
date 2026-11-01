@@ -12,6 +12,7 @@ import { ocorrencias } from '../dominio/recorrencia';
 import { chamar } from './api';
 
 export interface Configuracao {
+  nome?: string | null;
   renda_mensal: number;
   dia_salario: number | null;
   saldo_inicial: number;
@@ -182,12 +183,15 @@ export class Dados {
   private baixadoEm = 0;
   /** Muda sempre que os dados mudam (gravação aqui ou dados novos do servidor): as telas recarregam ao ver isso. */
   readonly versao = signal(0);
+  /** Vira true quando o documento chega pela primeira vez: até lá as telas mostram o "esqueleto" brilhando. */
+  readonly pronto = signal(false);
 
   /** Documento inteiro (baixa na primeira vez; depois usa a cópia em memória). */
   banco(): Promise<Banco> {
     this.cache ??= chamar<Banco>('dados').then(
       (b) => {
         this.baixadoEm = Date.now();
+        this.pronto.set(true);
         return b;
       },
       (e) => {

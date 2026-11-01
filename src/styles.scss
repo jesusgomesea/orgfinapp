@@ -13,8 +13,10 @@
   --apagado: #8b8b95; // contraste ≥ 4,5:1 sobre o fundo (texto pequeno legível)
   --destaque: #cfff04;
   --sobre-destaque: #0a0a0a;
-  --destaque-fraco: rgb(207 255 4 / 12%);
-  --positivo: #cfff04;
+  --destaque-fraco: color-mix(in srgb, var(--destaque) 12%, transparent);
+  /* destaque usado como cor de TEXTO; no tema claro vira uma versão escura (nucleo/aparencia.ts) */
+  --destaque-texto: var(--destaque);
+  --positivo: var(--destaque-texto);
   --negativo: #ff6b6b;
   --aviso-fundo: #2a2614;
   --erro-fundo: #2e1515;
@@ -236,10 +238,10 @@ label.ficha:not(.marcada) { opacity: .5; }
   border-radius: 28px; padding: 18px 20px 20px; margin-bottom: 18px;
   display: flex; flex-direction: column; gap: 10px;
   background:
-    radial-gradient(120% 90% at 100% 0%, rgb(207 255 4 / 55%) 0%, rgb(120 200 0 / 25%) 30%, transparent 60%),
+    radial-gradient(120% 90% at 100% 0%, color-mix(in srgb, var(--destaque) 55%, transparent) 0%, color-mix(in srgb, var(--destaque) 25%, transparent) 30%, transparent 60%),
     radial-gradient(90% 80% at 0% 100%, rgb(139 92 246 / 45%) 0%, transparent 60%),
     linear-gradient(160deg, #1c1c20 0%, #0d0d10 100%);
-  box-shadow: 0 20px 50px -20px rgb(207 255 4 / 25%), inset 0 1px 0 rgb(255 255 255 / 8%);
+  box-shadow: 0 20px 50px -20px color-mix(in srgb, var(--destaque) 25%, transparent), inset 0 1px 0 rgb(255 255 255 / 8%);
   small { color: rgb(255 255 255 / 70%); }
   .alerta { color: #ffb4b4; }
   // granulado sutil por cima do gradiente (textura "premium" sem imagem)
@@ -264,7 +266,7 @@ label.ficha:not(.marcada) { opacity: .5; }
 .barra {
   height: 8px; border-radius: 999px; background: var(--cartao-2); overflow: hidden;
   span { display: block; height: 100%; border-radius: inherit; transition: width .8s cubic-bezier(.2, .8, .2, 1);
-    background: linear-gradient(90deg, #8ccf00, var(--destaque)); box-shadow: 0 0 12px rgb(207 255 4 / 60%); }
+    background: linear-gradient(90deg, color-mix(in srgb, var(--destaque) 78%, black), var(--destaque)); box-shadow: 0 0 12px color-mix(in srgb, var(--destaque) 60%, transparent); }
   &.estourou span { background: linear-gradient(90deg, #f97316, var(--negativo)); box-shadow: 0 0 12px rgb(255 107 107 / 60%); }
   &.fina { height: 3px; margin-top: 5px; background: var(--cartao-2); border: 0; span { box-shadow: none; } }
 }
@@ -278,7 +280,7 @@ label.ficha:not(.marcada) { opacity: .5; }
     background: linear-gradient(160deg, #26262b, #18181b); border: 1px solid rgb(255 255 255 / 6%);
     transition: transform .15s;
   }
-  a:first-child span { background: linear-gradient(145deg, #e4ff6a, var(--destaque) 50%, #9ad600); color: var(--sobre-destaque); border: 0; box-shadow: 0 10px 24px -10px rgb(207 255 4 / 70%); }
+  a:first-child span { background: linear-gradient(145deg, color-mix(in srgb, var(--destaque) 55%, white), var(--destaque) 50%, color-mix(in srgb, var(--destaque) 78%, black)); color: var(--sobre-destaque); border: 0; box-shadow: 0 10px 24px -10px color-mix(in srgb, var(--destaque) 70%, transparent); }
   a:active span { transform: scale(.94); }
 }
 
@@ -343,7 +345,7 @@ label.ficha:not(.marcada) { opacity: .5; }
   height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 4px;
   .pilar { width: 100%; max-width: 20px; min-height: 3px; border-radius: 999px; background: linear-gradient(180deg, #3f3f46, #27272a);
     transform-origin: bottom; animation: crescer .7s cubic-bezier(.2, .8, .2, 1) both; }
-  &:first-child .pilar { background: linear-gradient(180deg, var(--destaque), #6fa800); box-shadow: 0 0 14px rgb(207 255 4 / 45%); }
+  &:first-child .pilar { background: linear-gradient(180deg, var(--destaque), color-mix(in srgb, var(--destaque) 78%, black)); box-shadow: 0 0 14px color-mix(in srgb, var(--destaque) 45%, transparent); }
   .valor { font-size: .58rem; color: var(--suave); }
   small { font-size: .62rem; color: var(--apagado); text-transform: capitalize; }
 }
@@ -458,7 +460,7 @@ label.ficha:not(.marcada) { opacity: .5; }
 body::before {
   content: ''; position: fixed; inset: 0 0 auto 0; height: 420px; z-index: -1; pointer-events: none;
   background:
-    radial-gradient(60% 70% at 85% -10%, rgb(207 255 4 / 13%), transparent 70%),
+    radial-gradient(60% 70% at 85% -10%, color-mix(in srgb, var(--destaque) 13%, transparent), transparent 70%),
     radial-gradient(50% 60% at 0% 0%, rgb(139 92 246 / 12%), transparent 70%);
 }
 
@@ -497,7 +499,7 @@ body::before {
 .entrada::before {
   content: ''; position: fixed; inset: -20% -40% auto -40%; height: 75vh; z-index: -1; pointer-events: none;
   background:
-    radial-gradient(40% 45% at 70% 40%, rgb(207 255 4 / 35%), transparent 70%),
+    radial-gradient(40% 45% at 70% 40%, color-mix(in srgb, var(--destaque) 35%, transparent), transparent 70%),
     radial-gradient(35% 40% at 30% 30%, rgb(139 92 246 / 35%), transparent 70%),
     radial-gradient(30% 35% at 55% 70%, rgb(56 189 248 / 18%), transparent 70%);
   filter: blur(30px);
@@ -509,13 +511,13 @@ body::before {
 }
 .entrada .cartao { background: rgb(24 24 27 / 70%); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid rgb(255 255 255 / 8%); }
 .entrada-marca h1 {
-  background: linear-gradient(100deg, #fff 30%, var(--destaque) 75%, #8ccf00);
+  background: linear-gradient(100deg, #fff 30%, var(--destaque) 75%, color-mix(in srgb, var(--destaque) 78%, black));
   -webkit-background-clip: text; background-clip: text; color: transparent;
 }
 
 // ---------- novo gasto ----------
 .balao.app { background: linear-gradient(160deg, #222226, #18181b); border: 1px solid rgb(255 255 255 / 5%); }
-.balao.voce { background: linear-gradient(135deg, #e4ff6a, var(--destaque) 60%, #a8e000); }
+.balao.voce { background: linear-gradient(135deg, color-mix(in srgb, var(--destaque) 55%, white), var(--destaque) 60%, color-mix(in srgb, var(--destaque) 78%, black)); }
 .compositor { background: linear-gradient(160deg, #1f1f23, #18181b); border: 1px solid rgb(255 255 255 / 6%); }
 // ---------- responsivo ----------
 // Celular é a base (tudo acima). Tablet: mais largura e blocos lado a lado. Desktop: menu lateral e telas em colunas.
@@ -569,9 +571,9 @@ body::before {
     }
     .mais {
       order: 1; margin-bottom: 16px; justify-content: center; height: 48px; border-radius: 999px;
-      background: linear-gradient(135deg, #e4ff6a, var(--destaque) 55%, #a8e000); color: var(--sobre-destaque); font-weight: 600;
-      box-shadow: 0 12px 28px -14px rgb(207 255 4 / 70%);
-      &:hover { background: linear-gradient(135deg, #e4ff6a, var(--destaque) 55%, #a8e000); color: var(--sobre-destaque); filter: brightness(1.05); }
+      background: linear-gradient(135deg, color-mix(in srgb, var(--destaque) 55%, white), var(--destaque) 55%, color-mix(in srgb, var(--destaque) 78%, black)); color: var(--sobre-destaque); font-weight: 600;
+      box-shadow: 0 12px 28px -14px color-mix(in srgb, var(--destaque) 70%, transparent);
+      &:hover { background: linear-gradient(135deg, color-mix(in srgb, var(--destaque) 55%, white), var(--destaque) 55%, color-mix(in srgb, var(--destaque) 78%, black)); color: var(--sobre-destaque); filter: brightness(1.05); }
     }
     .mais-icone { width: auto; height: auto; background: none; color: inherit; .icone { width: 20px; height: 20px; } }
     .mais-texto { display: inline; }
@@ -856,3 +858,194 @@ a.cartao-credito { text-decoration: none; }
 }
 .compositor textarea.lista-ia { overflow: auto; }.toast { width: max-content; }
 .balao { white-space: pre-line; } // respostas da IA com listas em linhas separadas
+
+// ---------- esqueleto de carregamento ----------
+// Enquanto os dados não chegam (Dados.pronto), cada bloco vira uma forma cinza com um brilho passando,
+// em vez de mostrar R$ 0,00 e listas vazias. Ativado pela classe .carregando no elemento da tela.
+.tela.carregando :is(.heroi, .cartao, .cofre, .destaque-mes, .cartao-credito) { position: relative; overflow: hidden; }
+.tela.carregando :is(.heroi, .cartao, .cofre, .cartao-credito) > * { visibility: hidden; }
+.tela.carregando :is(.heroi, .cartao, .cofre, .cartao-credito)::before {
+  content: ''; position: absolute; inset: 0; z-index: 2; border-radius: inherit; visibility: visible;
+  background: linear-gradient(100deg, transparent 20%, rgb(255 255 255 / 7%) 50%, transparent 80%) var(--cartao);
+  background-size: 220% 100%; animation: brilho-esqueleto 1.3s ease-in-out infinite;
+}
+.tela.carregando .cartao { min-height: 120px; }
+.tela.carregando .heroi { min-height: 260px; }
+@keyframes brilho-esqueleto { from { background-position: 120% 0; } to { background-position: -120% 0; } }
+// =====================================================================================================
+// Tema claro (Ajustes → Aparência). Os tokens mudam aqui; o resto do app já usa os tokens.
+// O cartão principal e a retrospectiva continuam escuros de propósito (como o cartão roxo do Nubank).
+// =====================================================================================================
+:root[data-tema='claro'] {
+  --fundo: #f4f4f5;
+  --cartao: #ffffff;
+  --cartao-2: #f1f1f4;
+  --borda: #e4e4e7;
+  --texto: #0b0b0f;
+  --suave: #52525b;
+  --apagado: #6b6b76;
+  --negativo: #dc2626;
+  --aviso-fundo: #fef3c7;
+  --erro-fundo: #fee2e2;
+  --ok-fundo: #ecfccb;
+  color-scheme: light;
+
+  .cartao, .cofre, .opcao-mais, .numeros-ano .cartao { box-shadow: 0 1px 2px rgb(0 0 0 / 4%), 0 6px 20px rgb(0 0 0 / 5%); }
+  input[type='date']::-webkit-calendar-picker-indicator { filter: none; }
+
+  // destaque como texto: versão escura legível no branco
+  .link, .parcela, .variacao, .marca span, .ia-titulo .icone, .toast-acao, .abas .ativa .icone, .primeira-parcela .link { color: var(--destaque-texto); }
+  .heroi .variacao { color: var(--destaque); }
+  .aviso { color: #713f12; }
+  .alerta-limite { color: #713f12; > .icone { color: #ca8a04; } }
+  .alerta-limite.estourou { color: #7f1d1d; }
+  .icone-cat { color: color-mix(in srgb, var(--cor) 75%, black); background: color-mix(in srgb, var(--cor) 16%, transparent); }
+  .check { border-color: #d4d4d8; }
+  .b-renda, .lg-renda { fill: #d4d4d8; background: #d4d4d8; }
+  .coluna .pilar { background: linear-gradient(180deg, #d4d4d8, #e4e4e7); }
+  .coluna:first-child .pilar { background: linear-gradient(180deg, var(--destaque), color-mix(in srgb, var(--destaque) 78%, black)); }
+  .atalhos span { background: var(--cartao); border-color: var(--borda); box-shadow: 0 1px 2px rgb(0 0 0 / 5%); }
+  .atalhos a:first-child span {
+    border: 0; color: var(--sobre-destaque);
+    background: linear-gradient(145deg, color-mix(in srgb, var(--destaque) 55%, white), var(--destaque) 50%, color-mix(in srgb, var(--destaque) 78%, black));
+  }
+  .heroi, .retro-convite { color: #fff; }
+  .abas { background: rgb(255 255 255 / 85%); border-color: var(--borda); box-shadow: 0 10px 30px rgb(0 0 0 / 8%); }
+  @media (min-width: 1100px) { .abas { background: rgb(255 255 255 / 92%); box-shadow: none; } }
+  .balao.app { background: var(--cartao); border-color: var(--borda); }
+  .compositor { background: var(--cartao); border-color: var(--borda); }
+  .vidro { color: #fff; }
+  body::before { opacity: .6; }
+  .entrada .cartao { background: rgb(255 255 255 / 80%); border-color: var(--borda); }
+  .entrada-marca h1 { background: linear-gradient(100deg, #0b0b0f 30%, var(--destaque-texto) 80%); -webkit-background-clip: text; background-clip: text; }
+  .tela.carregando :is(.heroi, .cartao, .cofre, .cartao-credito)::before {
+    background: linear-gradient(100deg, transparent 20%, rgb(0 0 0 / 5%) 50%, transparent 80%) var(--cartao-2);
+    background-size: 220% 100%;
+  }
+}
+
+// Ajustes → Aparência
+.escolha-tema { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.escolha-tema button { flex-direction: column; gap: 6px; min-height: 64px; border: 2px solid transparent; }
+.escolha-tema button.marcada { border-color: var(--destaque); }
+.escolha-cor { display: flex; flex-wrap: wrap; gap: 10px; }
+.escolha-cor button {
+  width: 40px; height: 40px; min-height: 40px; padding: 0; border-radius: 50%; border: 3px solid transparent;
+  box-shadow: 0 0 0 2px var(--fundo) inset;
+  &.marcada { border-color: var(--texto); }
+}
+// =====================================================================================================
+// Gaveta (bottom sheet), teclado de valor, deslizar itens, ritmo do mês, retrospectiva, confete
+// =====================================================================================================
+body.sem-rolagem { overflow: hidden; }
+
+.gaveta-fundo {
+  position: fixed; inset: 0; z-index: 40; background: rgb(0 0 0 / 55%);
+  backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); animation: aparecer .2s both;
+}
+.gaveta {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 41; margin: 0 auto; max-width: 520px;
+  max-height: calc(100dvh - env(safe-area-inset-top) - 24px); overflow-y: auto; overscroll-behavior: contain;
+  background: var(--cartao); border-radius: 28px 28px 0 0;
+  padding: 0 20px calc(env(safe-area-inset-bottom) + 20px);
+  display: flex; flex-direction: column; gap: 12px;
+  box-shadow: 0 -20px 60px rgb(0 0 0 / 40%);
+  animation: subir-gaveta .32s cubic-bezier(.2, .9, .2, 1) both;
+  transition: transform .2s;
+  &.arrastando { transition: none; }
+}
+.gaveta-alca { display: grid; place-items: center; height: 28px; cursor: grab; touch-action: none; span { width: 40px; height: 5px; border-radius: 999px; background: #52525b; } }
+.gaveta-titulo { justify-content: center; font-size: 1.05rem; margin-top: -4px; }
+@keyframes subir-gaveta { from { transform: translateY(100%); } }
+@keyframes aparecer { from { opacity: 0; } }
+@media (min-width: 768px) {
+  .gaveta { bottom: auto; top: 50%; left: 50%; right: auto; width: 440px; border-radius: 28px; transform: translate(-50%, -50%); animation: surgir-centro .25s both; padding-bottom: 20px; }
+  .gaveta.arrastando, .gaveta[style*='translateY'] { transform: translate(-50%, -50%); }
+  @keyframes surgir-centro { from { opacity: 0; transform: translate(-50%, -46%) scale(.97); } }
+}
+
+// Valor estilo Pix + teclado
+.valor-pix {
+  text-align: center; font-size: clamp(2.6rem, 13vw, 3.4rem); font-weight: 500; letter-spacing: -.05em; padding: 8px 0 4px;
+  font-variant-numeric: tabular-nums;
+  small { font-size: .4em; color: var(--suave); margin-right: 6px; vertical-align: .55em; letter-spacing: 0; }
+  &.vazio { color: var(--apagado); }
+}
+.teclado {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px;
+  button { min-height: 58px; font-size: 1.5rem; font-weight: 500; background: transparent; border-radius: 18px; }
+  button:active { background: var(--cartao-2); }
+}
+.valor-resumo {
+  all: unset; cursor: pointer; text-align: center; padding: 4px 0;
+  strong { font-size: 2rem; letter-spacing: -.04em; display: block; }
+}
+.fichas.rolagem-lateral {
+  flex-wrap: nowrap; overflow-x: auto; margin: 0 -20px; padding: 2px 20px 4px; scrollbar-width: none;
+  &::-webkit-scrollbar { display: none; }
+}
+.ficha-cat { padding-left: 4px; .icone-cat { width: 30px; height: 30px; border-radius: 999px; .icone { width: 15px; height: 15px; } } }
+
+// Deslizar item (direita = pago, esquerda = excluir)
+app-item.linha-lancamento { position: relative; display: block; padding: 0; touch-action: pan-y; overflow: hidden; }
+.deslize-frente {
+  position: relative; z-index: 1; display: flex; align-items: center; gap: 10px; padding: 12px 0;
+  background: var(--cartao); transition: transform .25s cubic-bezier(.2, .9, .2, 1);
+}
+.deslizando .deslize-frente { transition: none; }
+.deslize-fundo {
+  position: absolute; inset: 0; display: flex; justify-content: space-between; align-items: center; padding: 0 16px;
+  font-weight: 600; font-size: .85rem;
+  span { display: flex; align-items: center; gap: 6px; opacity: .5; transition: opacity .15s, transform .15s; }
+  .pronto { opacity: 1; transform: scale(1.06); }
+}
+.deslizando .deslize-fundo { background: linear-gradient(90deg, var(--destaque) 50%, var(--negativo) 50%); }
+.deslize-pago { color: var(--sobre-destaque); }
+.deslize-excluir { color: #fff; }
+app-item:not(.deslizando) .deslize-fundo { visibility: hidden; }
+
+// Ritmo do mês
+.grafico-ritmo { width: 100%; height: auto; overflow: visible; }
+.r-anterior { stroke: #52525b; stroke-width: 2; stroke-dasharray: 4 4; }
+.r-atual { stroke: var(--destaque); stroke-width: 3; stroke-linejoin: round; stroke-linecap: round; }
+.r-area { fill: color-mix(in srgb, var(--destaque) 14%, transparent); }
+.r-hoje { fill: var(--destaque); stroke: var(--cartao); stroke-width: 2; }
+.grafico-ritmo text { fill: var(--apagado); font-size: 9px; font-family: var(--fonte); }
+.ritmo-msg { margin: 0; font-size: .9rem; color: var(--positivo); &.ruim { color: var(--negativo); } }
+.lg-atual { background: var(--destaque); } .lg-anterior { background: #52525b; }
+
+// Convite para a retrospectiva
+.retro-convite {
+  display: flex; align-items: center; gap: 12px; padding: 14px 16px; margin-bottom: 14px; border-radius: var(--raio);
+  text-decoration: none; color: #fff;
+  background: radial-gradient(120% 140% at 100% 0%, color-mix(in srgb, var(--destaque) 55%, transparent), transparent 55%),
+              radial-gradient(100% 120% at 0% 100%, rgb(139 92 246 / 60%), transparent 60%), #141418;
+  > span:nth-child(2) { flex: 1; display: flex; flex-direction: column; small { opacity: .75; } }
+}
+.retro-convite-icone { width: 40px; height: 40px; border-radius: 14px; display: grid; place-items: center; background: rgb(255 255 255 / 14%); }
+
+// Retrospectiva (tela cheia, por cima de tudo)
+.retrospectiva {
+  position: fixed; inset: 0; z-index: 60; display: block; background: #09090b; color: #fff;
+  user-select: none; -webkit-user-select: none;
+}
+.retro-barras {
+  position: absolute; z-index: 2; top: calc(env(safe-area-inset-top) + 10px); left: 12px; right: 12px; display: flex; gap: 4px;
+  span { flex: 1; height: 3px; border-radius: 3px; background: rgb(255 255 255 / 25%); overflow: hidden; }
+  i { display: block; height: 100%; background: #fff; }
+}
+.retro-fechar { position: absolute; z-index: 3; top: calc(env(safe-area-inset-top) + 22px); right: 8px; color: #fff; }
+.retro-slide {
+  position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center; gap: 12px;
+  padding: calc(env(safe-area-inset-top) + 70px) 28px calc(env(safe-area-inset-bottom) + 40px);
+  max-width: 560px; margin: 0 auto; animation: surgir .45s cubic-bezier(.2, .8, .2, 1) both;
+}
+.retro-sobre { font-size: 1rem; opacity: .8; text-transform: uppercase; letter-spacing: .08em; }
+.retro-grande { font-size: clamp(2.6rem, 12vw, 4.5rem); font-weight: 600; letter-spacing: -.05em; line-height: 1; overflow-wrap: anywhere; }
+.retro-texto { font-size: 1.25rem; margin: 0; line-height: 1.35; }
+.retro-detalhe { margin: 0; opacity: .75; }
+
+.confete { position: fixed; inset: 0; width: 100vw; height: 100vh; z-index: 70; pointer-events: none; }
+// O cartão principal é sempre escuro (nos dois temas): texto sempre claro.
+.heroi { color: #fff; }
+.escolha-tema button { min-width: 0; padding: 0 6px; font-size: .86rem; }

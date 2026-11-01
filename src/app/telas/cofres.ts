@@ -8,6 +8,7 @@ import { mensagemDeErro } from '../nucleo/api';
 import { Avisos } from '../nucleo/avisos';
 import { Cofre, CofreResumo, Dados, MovimentoCofre } from '../nucleo/dados';
 import { dataCurta, hoje } from '../nucleo/formato';
+import { comemorar, vibrar } from '../nucleo/efeitos';
 import { Icone } from '../nucleo/icone';
 import { Privacidade } from '../nucleo/privacidade';
 
@@ -15,7 +16,7 @@ const CORES = ['#cfff04', '#22c55e', '#38bdf8', '#a78bfa', '#f472b6', '#fb923c',
 
 @Component({
   selector: 'app-cofres',
-  host: { class: 'tela tela-cofres' },
+  host: { class: 'tela tela-cofres', '[class.carregando]': '!dados.pronto()' },
   imports: [FormsModule, Icone],
   template: `
     <header class="topo">
@@ -106,7 +107,7 @@ const CORES = ['#cfff04', '#22c55e', '#38bdf8', '#a78bfa', '#f472b6', '#fb923c',
   `,
 })
 export class Cofres {
-  private readonly dados = inject(Dados);
+  protected readonly dados = inject(Dados);
   private readonly avisos = inject(Avisos);
   protected readonly priv = inject(Privacidade);
 
@@ -174,6 +175,14 @@ export class Cofres {
     try {
       await this.dados.movimentarCofre({ cofre_id: c.id, valor: sinal * Math.abs(valor), data: hoje(), nota: '' });
       this.valores[c.id] = null;
+      // Bateu a meta com este depósito: festa!
+      const depois = c.saldo + sinal * Math.abs(valor);
+      if (sinal > 0 && c.meta_valor && c.saldo < c.meta_valor && depois >= c.meta_valor) {
+        comemorar([c.cor, '#ffffff', '#cfff04', '#a78bfa']);
+        this.avisos.mostrar(`Meta de "${c.nome}" batida! 🎉`, 'ok', 5000);
+        return;
+      }
+      vibrar(sinal > 0 ? [10, 30, 10] : 10);
       this.avisos.mostrar(sinal > 0 ? `${this.priv.mostrar(valor)} guardados em ${c.nome}` : `${this.priv.mostrar(valor)} retirados de ${c.nome}`);
     } catch (e) {
       this.erro.set(mensagemDeErro(e));
